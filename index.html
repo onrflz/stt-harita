@@ -340,9 +340,11 @@
     function getFactoryMatchedRows(rows, selectedFactoryKey) {
       const selectedFactoryName = normalizeText(factories[selectedFactoryKey]?.name || "");
 
-      return rows.filter(row =>
+      const matched = rows.filter(row =>
         normalizeText(row.stt_baslangic_normalized || row.stt_baslangic || "") === selectedFactoryName
       );
+
+      return matched.length > 0 ? matched : rows;
     }
 
     function findSheetRow(destinationObj, inputText, selectedFactoryKey) {
@@ -359,10 +361,6 @@
       }
 
       const factoryRows = getFactoryMatchedRows(provinceRows, selectedFactoryKey);
-
-      if (factoryRows.length === 0) {
-        return null;
-      }
 
       if (resolved.districtKey) {
         const exactDistrictRows = factoryRows.filter(row =>
@@ -383,40 +381,6 @@
       }
 
       return factoryRows[0] || null;
-    }
-
-    function findRivalRow(destinationObj, inputText) {
-      const resolved = resolveDestinationForSheet(destinationObj, inputText);
-
-      if (!resolved.province) return null;
-
-      const provinceRows = priceData.filter(row =>
-        normalizeText(row.il_normalized || row.il || "") === resolved.province
-      );
-
-      if (provinceRows.length === 0) {
-        return null;
-      }
-
-      if (resolved.districtKey) {
-        const exactDistrictRows = provinceRows.filter(row =>
-          normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === resolved.districtKey
-        );
-
-        if (exactDistrictRows.length > 0) {
-          return exactDistrictRows[0];
-        }
-      }
-
-      const blankLokasyonRows = provinceRows.filter(row =>
-        normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === ""
-      );
-
-      if (blankLokasyonRows.length > 0) {
-        return blankLokasyonRows[0];
-      }
-
-      return provinceRows[0] || null;
     }
 
     function formatDate(value) {
@@ -536,7 +500,7 @@
         return;
       }
 
-      await loadPriceData();
+      await loadPriceData(true);
 
       const selectedFactoryKey = startSelect.value;
       const selectedFactory = factories[selectedFactoryKey];
@@ -552,9 +516,7 @@
       infoBox.innerHTML = '<div class="info-line my-line">Mesafe hesaplanıyor...</div>';
 
       try {
-        const ownRow = findSheetRow(selectedDestination, destinationTextForPricing, selectedFactoryKey);
-        const rivalRow = findRivalRow(selectedDestination, destinationTextForPricing);
-
+        const sheetRow = findSheetRow(selectedDestination, destinationTextForPricing, selectedFactoryKey);
         const myRoute = await fetchBestRoute(start, end);
 
         if (!myRoute) {
@@ -563,7 +525,7 @@
         }
 
         const myDistance = (myRoute.distance / 1000).toFixed(1);
-        const ownPrice = getOwnPriceFromRow(ownRow, selectedFactoryKey);
+        const ownPrice = getOwnPriceFromRow(sheetRow, selectedFactoryKey);
 
         const myPriceData = {
           price: ownPrice.price,
@@ -584,8 +546,8 @@
           warnings.push("Uyarı: API çıktısında lokasyon_key alanı görünmüyor. App Script eski deployment olabilir.");
         }
 
-        if (rivalRow && (rivalRow.ytong_baslangic_normalized || rivalRow.ytong_baslangic)) {
-          const ytongKey = normalizeText(rivalRow.ytong_baslangic_normalized || rivalRow.ytong_baslangic || "");
+        if (sheetRow && (sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic)) {
+          const ytongKey = normalizeText(sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic || "");
           const ytongStartPoint = rivalStartPoints[ytongKey];
 
           if (ytongStartPoint) {
@@ -609,8 +571,8 @@
               rivalData = {
                 name: "Ytong - " + ytongStartPoint.name,
                 distance: rivalDistance,
-                price: rivalRow.ytong_fiyat || "",
-                date: formatDate(rivalRow.ytong_tarih || "")
+                price: sheetRow.ytong_fiyat || "",
+                date: formatDate(sheetRow.ytong_tarih || "")
               };
             }
           }
@@ -635,8 +597,8 @@
             arkozData = {
               name: arkozFactory.name,
               distance: arkozDistance,
-              price: rivalRow ? (rivalRow.arkoz_fiyat || "") : "",
-              date: rivalRow ? formatDate(rivalRow.arkoz_tarih || "") : ""
+              price: sheetRow ? (sheetRow.arkoz_fiyat || "") : "",
+              date: sheetRow ? formatDate(sheetRow.arkoz_tarih || "") : ""
             };
           }
         }
@@ -662,11 +624,11 @@
 
         if (group.length > 0) {
           const featureGroup = L.featureGroup(group);
-          map.fitBounds(featureGroup.getBounds(), { padding: [20, 20], animate: false });
+          map.fitBounds(featureGroup.getBounds(), { padding: [20, 20] });
         }
 
-        if (!ownRow) {
-          infoBox.innerHTML += '<div class="info-line warn-line">Uyarı: Seçilen fabrika için bu varış noktasında fiyat tanımı bulunamadı.</div>';
+        if (!sheetRow) {
+          infoBox.innerHTML += '<div class="info-line warn-line">Uyarı: Sheet içinde bu varış yeri için eşleşen satır bulunamadı.</div>';
         }
 
       } catch (error) {
