@@ -338,50 +338,53 @@
     }
 
     function getFactoryMatchedRows(rows, selectedFactoryKey) {
-      const selectedFactoryName = normalizeText(factories[selectedFactoryKey]?.name || "");
+  const selectedFactoryName = normalizeText(factories[selectedFactoryKey]?.name || "");
 
-      const matched = rows.filter(row =>
-        normalizeText(row.stt_baslangic_normalized || row.stt_baslangic || "") === selectedFactoryName
-      );
-
-      return matched.length > 0 ? matched : rows;
-    }
+  return rows.filter(row =>
+    normalizeText(row.stt_baslangic_normalized || row.stt_baslangic || "") === selectedFactoryName
+  );
+}
 
     function findSheetRow(destinationObj, inputText, selectedFactoryKey) {
-      const resolved = resolveDestinationForSheet(destinationObj, inputText);
+  const resolved = resolveDestinationForSheet(destinationObj, inputText);
 
-      if (!resolved.province) return null;
+  if (!resolved.province) return null;
 
-      const provinceRows = priceData.filter(row =>
-        normalizeText(row.il_normalized || row.il || "") === resolved.province
-      );
+  const provinceRows = priceData.filter(row =>
+    normalizeText(row.il_normalized || row.il || "") === resolved.province
+  );
 
-      if (provinceRows.length === 0) {
-        return null;
-      }
+  if (provinceRows.length === 0) {
+    return null;
+  }
 
-      const factoryRows = getFactoryMatchedRows(provinceRows, selectedFactoryKey);
+  const factoryRows = getFactoryMatchedRows(provinceRows, selectedFactoryKey);
 
-      if (resolved.districtKey) {
-        const exactDistrictRows = factoryRows.filter(row =>
-          normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === resolved.districtKey
-        );
+  // Seçilen fabrikaya ait hiç satır yoksa başka fabrikanın fiyatına düşme
+  if (factoryRows.length === 0) {
+    return null;
+  }
 
-        if (exactDistrictRows.length > 0) {
-          return exactDistrictRows[0];
-        }
-      }
+  if (resolved.districtKey) {
+    const exactDistrictRows = factoryRows.filter(row =>
+      normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === resolved.districtKey
+    );
 
-      const blankLokasyonRows = factoryRows.filter(row =>
-        normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === ""
-      );
-
-      if (blankLokasyonRows.length > 0) {
-        return blankLokasyonRows[0];
-      }
-
-      return factoryRows[0] || null;
+    if (exactDistrictRows.length > 0) {
+      return exactDistrictRows[0];
     }
+  }
+
+  const blankLokasyonRows = factoryRows.filter(row =>
+    normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === ""
+  );
+
+  if (blankLokasyonRows.length > 0) {
+    return blankLokasyonRows[0];
+  }
+
+  return factoryRows[0] || null;
+}
 
     function formatDate(value) {
       if (!value) return "";
