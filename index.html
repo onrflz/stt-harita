@@ -491,7 +491,7 @@
       return bestRoute;
     }
 
-    function createDistanceLabel(routeCoords, text, color, ratio = 0.55, offsetY = -165) {
+    function createDistanceLabel(routeCoords, text, color, ratio = 0.12, offsetY = -165) {
   const pointIndex = Math.max(0, Math.floor(routeCoords.length * ratio) - 1);
   const point =
     routeCoords[pointIndex] ||
@@ -635,7 +635,7 @@
         const ownPrice = getOwnPriceFromRow(sheetRow);
 
         const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, 0.58, -165);
+        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, 0.12, -165);
 
         const myPriceData = {
           price: ownPrice.price,
@@ -659,7 +659,7 @@
               const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
               addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
-              addRouteToMap(rivalCoords, YTONG_COLOR, rivalDistanceKm, orderPool, 0.42, -165);
+              addRouteToMap(rivalCoords, YTONG_COLOR, rivalDistanceKm, orderPool, 0.12, -165);
 
               rivalEntries.push({
                 name: "Ytong - " + ytongStartPoint.name,
@@ -688,15 +688,7 @@
           const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
           addMapMarker(rival.coords, rival.name);
-          let labelRatio = 0.55;
-let labelOffsetY = -165;
-
-if (rival.key === "arkoz") {
-  labelRatio = 0.35;
-} else if (rival.key === "ege") {
-  labelRatio = 0.28;
-} else if (rival.key === "kcs") {
-  labelRatio = 0.70;
+          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, 0.12, -165);
 }
 
 addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, labelRatio, labelOffsetY);
