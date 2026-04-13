@@ -75,6 +75,14 @@
       color: #c62828;
     }
 
+    .ege-line {
+      color: #1b5e20;
+    }
+
+    .kcs-line {
+      color: #1565c0;
+    }
+
     .warn-line {
       color: #b00020;
     }
@@ -101,6 +109,18 @@
 
     .suggestion-item:hover {
       background: #f2f2f2;
+    }
+
+    .distance-label {
+      background: rgba(255, 255, 255, 0.92);
+      border: 2px solid currentColor;
+      border-radius: 14px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: bold;
+      white-space: nowrap;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+      transform: translate(-50%, -50%);
     }
   </style>
 </head>
@@ -141,8 +161,11 @@
     const PRICE_API_URL = "https://script.google.com/macros/s/AKfycbyoiajcbWbl-pkn37lXOtA399MlcPBiezliboucvTnEpnHvYaFZ0vto6-ShFtcgEBKoNw/exec";
 
     const MY_COLOR = "#0b3d91";
-    const RIVAL_COLOR = "#c79a00";
+    const YTONG_COLOR = "#c79a00";
     const ARKOZ_COLOR = "#c62828";
+    const EGE_COLOR = "#1b5e20";
+    const KCS_COLOR = "#1565c0";
+    const DISTANCE_LIMIT_KM = 500;
 
     const factories = {
       kirikkale: {
@@ -163,26 +186,47 @@
       catalca: { name: "Çatalca", coords: [41.20506, 28.45473] },
       arkoz: { name: "Arkoz", coords: [41.01296, 35.81233] },
       antalya: { name: "Antalya", coords: [37.09081, 30.61814] },
-      ege: { name: "EGE", coords: [38.43191, 27.22041] }
+      ege: { name: "EGE", coords: [38.43196, 27.22032] },
+      kcs: { name: "KÇS", coords: [37.76153, 27.44458] }
     };
 
-    const arkozFactory = {
-      name: "Arkoz",
-      coords: [41.01296, 35.81233]
-    };
+    const limitedRivals = [
+      {
+        key: "arkoz",
+        name: "Arkoz",
+        coords: [41.01296, 35.81233],
+        color: ARKOZ_COLOR,
+        cssClass: "arkoz-line",
+        priceKey: "arkoz_fiyat",
+        dateKey: "arkoz_tarih"
+      },
+      {
+        key: "ege",
+        name: "EGE",
+        coords: [38.43196, 27.22032],
+        color: EGE_COLOR,
+        cssClass: "ege-line",
+        priceKey: "ege_fiyat",
+        dateKey: "ege_tarih"
+      },
+      {
+        key: "kcs",
+        name: "KÇS",
+        coords: [37.76153, 27.44458],
+        color: KCS_COLOR,
+        cssClass: "kcs-line",
+        priceKey: "kcs_fiyat",
+        dateKey: "kcs_tarih"
+      }
+    ];
 
     let priceData = [];
     let selectedDestination = null;
     let apiHasLokasyonKey = false;
 
-    let myRouteLine = null;
-    let rivalRouteLine = null;
-    let arkozRouteLine = null;
-
-    let startMarker = null;
-    let endMarker = null;
-    let rivalStartMarker = null;
-    let arkozStartMarker = null;
+    let routeLayers = [];
+    let pointMarkers = [];
+    let distanceLabels = [];
 
     const startSelect = document.getElementById("startSelect");
     const destinationInput = document.getElementById("destinationInput");
@@ -212,14 +256,13 @@
     }
 
     function clearMapLayers() {
-      if (myRouteLine) { map.removeLayer(myRouteLine); myRouteLine = null; }
-      if (rivalRouteLine) { map.removeLayer(rivalRouteLine); rivalRouteLine = null; }
-      if (arkozRouteLine) { map.removeLayer(arkozRouteLine); arkozRouteLine = null; }
+      routeLayers.forEach(layer => map.removeLayer(layer));
+      pointMarkers.forEach(marker => map.removeLayer(marker));
+      distanceLabels.forEach(label => map.removeLayer(label));
 
-      if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
-      if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
-      if (rivalStartMarker) { map.removeLayer(rivalStartMarker); rivalStartMarker = null; }
-      if (arkozStartMarker) { map.removeLayer(arkozStartMarker); arkozStartMarker = null; }
+      routeLayers = [];
+      pointMarkers = [];
+      distanceLabels = [];
     }
 
     function resetAll() {
@@ -437,15 +480,73 @@
       return bestRoute;
     }
 
-    function renderInfo(myFactoryName, destinationName, myDistance, myPriceData, rivalData, arkozData, extraWarnings = []) {
+    function getPriceUnit(selectedFactoryKey, routeType) {
+      if (selectedFactoryKey === "corlu" && (routeType === "mine" || routeType === "ytong")) {
+        return "TL/m3";
+      }
+      return "TL/ton";
+    }
+
+    function createDistanceLabel(routeCoords, text, color) {
+      const pointIndex = Math.max(0, Math.floor(routeCoords.length * 0.55) - 1);
+      const point = routeCoords[pointIndex] || routeCoords[Math.floor(routeCoords.length / 2)] || routeCoords[0];
+
+      const icon = L.divIcon({
+        className: "",
+        html: '<div class="distance-label" style="color:' + color + ';">' + text + '</div>'
+      });
+
+      const marker = L.marker(point, {
+        icon: icon,
+        interactive: false,
+        keyboard: false
+      });
+
+      return marker;
+    }
+
+    function addMapMarker(coords, popupText) {
+      const marker = L.marker(coords).addTo(map).bindPopup(popupText);
+      pointMarkers.push(marker);
+      return marker;
+    }
+
+    function addRouteToMap(routeCoords, color, distanceKm, orderPool) {
+      const line = L.polyline(routeCoords, {
+        color: color,
+        weight: 5,
+        opacity: 0.95
+      }).addTo(map);
+
+      routeLayers.push(line);
+
+      const label = createDistanceLabel(routeCoords, distanceKm.toFixed(1) + " km", color).addTo(map);
+      distanceLabels.push(label);
+
+      orderPool.push({
+        line: line,
+        distanceKm: distanceKm
+      });
+
+      return line;
+    }
+
+    function applyRouteDisplayPriority(orderPool) {
+      orderPool
+        .sort((a, b) => b.distanceKm - a.distanceKm)
+        .forEach(item => item.line.bringToFront());
+    }
+
+    function renderInfo(myFactoryName, destinationName, myPriceData, rivalEntries, extraWarnings = []) {
+      const myUnit = getPriceUnit(startSelect.value, "mine");
+
       let myText =
         "Başlangıç: " + myFactoryName +
-        " | Varış: " + destinationName +
-        " | Mesafe: " + myDistance + " km";
+        " | Varış: " + destinationName;
 
       if (myPriceData && myPriceData.price) {
         myText +=
-          " | Nakliye: " + myPriceData.price + " TL/ton" +
+          " | Nakliye: " + myPriceData.price + " " + myUnit +
           (myPriceData.date ? " | Fiyat Güncelleme Tarihi: " + myPriceData.date : "");
       } else {
         myText += " | Nakliye: TANIMLI DEĞİL";
@@ -453,39 +554,23 @@
 
       let html = '<div class="info-line my-line">' + myText + '</div>';
 
-      if (rivalData) {
-        let rivalText =
-          "Rakip Çıkış Noktası: " + rivalData.name +
-          " | Varış: " + destinationName +
-          " | Mesafe: " + rivalData.distance + " km";
+      rivalEntries.forEach(item => {
+        const unit = getPriceUnit(startSelect.value, item.routeType);
 
-        if (rivalData.price) {
-          rivalText +=
-            " | Nakliye: " + rivalData.price + " TL/ton" +
-            (rivalData.date ? " | Fiyat Güncelleme Tarihi: " + rivalData.date : "");
+        let text =
+          "Rakip Çıkış Noktası: " + item.name +
+          " | Varış: " + destinationName;
+
+        if (item.price) {
+          text +=
+            " | Nakliye: " + item.price + " " + unit +
+            (item.date ? " | Fiyat Güncelleme Tarihi: " + item.date : "");
         } else {
-          rivalText += " | Nakliye: TANIMLI DEĞİL";
+          text += " | Nakliye: TANIMLI DEĞİL";
         }
 
-        html += '<div class="info-line rival-line">' + rivalText + '</div>';
-      }
-
-      if (arkozData) {
-        let arkozText =
-          "Rakip Çıkış Noktası: " + arkozData.name +
-          " | Varış: " + destinationName +
-          " | Mesafe: " + arkozData.distance + " km";
-
-        if (arkozData.price) {
-          arkozText +=
-            " | Nakliye: " + arkozData.price + " TL/ton" +
-            (arkozData.date ? " | Fiyat Güncelleme Tarihi: " + arkozData.date : "");
-        } else {
-          arkozText += " | Nakliye: TANIMLI DEĞİL";
-        }
-
-        html += '<div class="info-line arkoz-line">' + arkozText + '</div>';
-      }
+        html += '<div class="info-line ' + item.cssClass + '">' + text + '</div>';
+      });
 
       extraWarnings.forEach(warn => {
         html += '<div class="info-line warn-line">' + warn + '</div>';
@@ -510,8 +595,8 @@
 
       clearMapLayers();
 
-      startMarker = L.marker(start).addTo(map).bindPopup(selectedFactory.name);
-      endMarker = L.marker(end).addTo(map).bindPopup(selectedDestination.display_name);
+      addMapMarker(start, selectedFactory.name);
+      addMapMarker(end, selectedDestination.display_name);
 
       infoBox.innerHTML = '<div class="info-line my-line">Mesafe hesaplanıyor...</div>';
 
@@ -524,23 +609,20 @@
           return;
         }
 
-        const myDistance = (myRoute.distance / 1000).toFixed(1);
+        const orderPool = [];
+        const warnings = [];
+        const rivalEntries = [];
+
+        const myDistanceKm = myRoute.distance / 1000;
         const ownPrice = getOwnPriceFromRow(sheetRow, selectedFactoryKey);
+
+        const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool);
 
         const myPriceData = {
           price: ownPrice.price,
           date: ownPrice.date
         };
-
-        const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-        myRouteLine = L.polyline(myCoords, {
-          color: MY_COLOR,
-          weight: 5
-        }).addTo(map);
-
-        let rivalData = null;
-        let arkozData = null;
-        const warnings = [];
 
         if (!apiHasLokasyonKey) {
           warnings.push("Uyarı: API çıktısında lokasyon_key alanı görünmüyor. App Script eski deployment olabilir.");
@@ -551,77 +633,66 @@
           const ytongStartPoint = rivalStartPoints[ytongKey];
 
           if (ytongStartPoint) {
-            const rivalStart = ytongStartPoint.coords;
-
-            rivalStartMarker = L.marker(rivalStart)
-              .addTo(map)
-              .bindPopup("Ytong - " + ytongStartPoint.name);
-
-            const rivalRoute = await fetchBestRoute(rivalStart, end);
+            const rivalRoute = await fetchBestRoute(ytongStartPoint.coords, end);
 
             if (rivalRoute) {
-              const rivalDistance = (rivalRoute.distance / 1000).toFixed(1);
-
+              const rivalDistanceKm = rivalRoute.distance / 1000;
               const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-              rivalRouteLine = L.polyline(rivalCoords, {
-                color: RIVAL_COLOR,
-                weight: 5
-              }).addTo(map);
 
-              rivalData = {
+              addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
+              addRouteToMap(rivalCoords, YTONG_COLOR, rivalDistanceKm, orderPool);
+
+              rivalEntries.push({
                 name: "Ytong - " + ytongStartPoint.name,
-                distance: rivalDistance,
+                distance: rivalDistanceKm.toFixed(1),
                 price: sheetRow.ytong_fiyat || "",
-                date: formatDate(sheetRow.ytong_tarih || "")
-              };
+                date: formatDate(sheetRow.ytong_tarih || ""),
+                cssClass: "rival-line",
+                routeType: "ytong"
+              });
             }
           }
         }
 
-        if (arkozFactory) {
-          const arkozStart = arkozFactory.coords;
+        for (const rival of limitedRivals) {
+          const rivalRoute = await fetchBestRoute(rival.coords, end);
 
-          arkozStartMarker = L.marker(arkozStart).addTo(map).bindPopup(arkozFactory.name);
-
-          const arkozRoute = await fetchBestRoute(arkozStart, end);
-
-          if (arkozRoute) {
-            const arkozDistance = (arkozRoute.distance / 1000).toFixed(1);
-
-            const arkozCoords = arkozRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-            arkozRouteLine = L.polyline(arkozCoords, {
-              color: ARKOZ_COLOR,
-              weight: 5
-            }).addTo(map);
-
-            arkozData = {
-              name: arkozFactory.name,
-              distance: arkozDistance,
-              price: sheetRow ? (sheetRow.arkoz_fiyat || "") : "",
-              date: sheetRow ? formatDate(sheetRow.arkoz_tarih || "") : ""
-            };
+          if (!rivalRoute) {
+            continue;
           }
+
+          const rivalDistanceKm = rivalRoute.distance / 1000;
+
+          if (rivalDistanceKm > DISTANCE_LIMIT_KM) {
+            continue;
+          }
+
+          const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+
+          addMapMarker(rival.coords, rival.name);
+          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool);
+
+          rivalEntries.push({
+            name: rival.name,
+            distance: rivalDistanceKm.toFixed(1),
+            price: sheetRow ? (sheetRow[rival.priceKey] || "") : "",
+            date: sheetRow ? formatDate(sheetRow[rival.dateKey] || "") : "",
+            cssClass: rival.cssClass,
+            routeType: rival.key
+          });
         }
+
+        applyRouteDisplayPriority(orderPool);
 
         renderInfo(
           selectedFactory.name,
           selectedDestination.display_name,
-          myDistance,
           myPriceData,
-          rivalData,
-          arkozData,
+          rivalEntries,
           warnings
         );
 
-        const group = [];
-        if (myRouteLine) group.push(myRouteLine);
-        if (rivalRouteLine) group.push(rivalRouteLine);
-        if (arkozRouteLine) group.push(arkozRouteLine);
-        if (startMarker) group.push(startMarker);
-        if (rivalStartMarker) group.push(rivalStartMarker);
-        if (arkozStartMarker) group.push(arkozStartMarker);
-        if (endMarker) group.push(endMarker);
-
+        const group = [...routeLayers, ...pointMarkers, ...distanceLabels];
         if (group.length > 0) {
           const featureGroup = L.featureGroup(group);
           map.fitBounds(featureGroup.getBounds(), { padding: [20, 20] });
