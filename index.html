@@ -120,7 +120,7 @@
       font-weight: bold;
       white-space: nowrap;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-      transform: translate(-50%, -140%);
+      transform: translate(-50%, -180%);
     }
   </style>
 </head>
@@ -488,7 +488,7 @@
     }
 
     function createDistanceLabel(routeCoords, text, color) {
-      const pointIndex = Math.max(0, Math.floor(routeCoords.length * 0.55) - 1);
+      const pointIndex = Math.max(0, Math.floor(routeCoords.length * 0.8) - 1);
       const point = routeCoords[pointIndex] || routeCoords[Math.floor(routeCoords.length / 2)] || routeCoords[0];
 
       const icon = L.divIcon({
