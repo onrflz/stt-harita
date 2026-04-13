@@ -115,24 +115,24 @@
     }
 
     .distance-label {
-  background: rgba(255, 255, 255, 0.96);
-  border: 2px solid currentColor;
-  border-radius: 14px;
-  padding: 3px 8px 1px 8px;
-  font-size: 12px;
-  font-weight: bold;
-  white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-  text-align: center;
-  line-height: 1.1;
-}
+      background: rgba(255, 255, 255, 0.96);
+      border: 2px solid currentColor;
+      border-radius: 14px;
+      padding: 3px 8px 1px 8px;
+      font-size: 12px;
+      font-weight: bold;
+      white-space: nowrap;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+      text-align: center;
+      line-height: 1.1;
+    }
 
-.distance-pointer {
-  display: block;
-  font-size: 11px;
-  line-height: 1;
-  margin-top: 1px;
-}
+    .distance-pointer {
+      display: block;
+      font-size: 11px;
+      line-height: 1;
+      margin-top: 1px;
+    }
   </style>
 </head>
 <body>
@@ -491,30 +491,24 @@
       return bestRoute;
     }
 
-    function createDistanceLabel(routeCoords, text, color, ratio = 0.12, offsetY = -165) {
-  const pointIndex = Math.max(0, Math.floor(routeCoords.length * ratio) - 1);
-  const point =
-    routeCoords[pointIndex] ||
-    routeCoords[Math.floor(routeCoords.length / 2)] ||
-    routeCoords[0];
+    function createDistanceLabel(routeCoords, text, color, ratio = 0.12, offsetY = -160) {
+      const pointIndex = Math.max(1, Math.floor(routeCoords.length * ratio));
+      const point = routeCoords[pointIndex] || routeCoords[1] || routeCoords[0];
 
-  const icon = L.divIcon({
-    className: "",
-    html:
-      '<div class="distance-label" style="color:' + color + '; transform: translate(-50%, ' + offsetY + '%);">' +
-        text +
-        '<span class="distance-pointer">&#9660;</span>' +
-      '</div>'
-  });
+      const icon = L.divIcon({
+        className: "",
+        html:
+          '<div class="distance-label" style="color:' + color + '; transform: translate(-50%, ' + offsetY + '%);">' +
+            text +
+            '<span class="distance-pointer">&#9660;</span>' +
+          '</div>'
+      });
 
-  const marker = L.marker(point, {
-    icon: icon,
-    interactive: false,
-    keyboard: false
-  });
-
-  return marker;
-}
+      return L.marker(point, {
+        icon: icon,
+        interactive: false,
+        keyboard: false
+      });
     }
 
     function addMapMarker(coords, popupText) {
@@ -523,32 +517,31 @@
       return marker;
     }
 
-    function addRouteToMap(routeCoords, color, distanceKm, orderPool, labelRatio = 0.55, labelOffsetY = -165) {
-  const line = L.polyline(routeCoords, {
-    color: color,
-    weight: 5,
-    opacity: 0.95
-  }).addTo(map);
+    function addRouteToMap(routeCoords, color, distanceKm, orderPool, labelRatio = 0.12, labelOffsetY = -160) {
+      const line = L.polyline(routeCoords, {
+        color: color,
+        weight: 5,
+        opacity: 0.95
+      }).addTo(map);
 
-  routeLayers.push(line);
+      routeLayers.push(line);
 
-  const label = createDistanceLabel(
-    routeCoords,
-    distanceKm.toFixed(1) + " km",
-    color,
-    labelRatio,
-    labelOffsetY
-  ).addTo(map);
+      const label = createDistanceLabel(
+        routeCoords,
+        distanceKm.toFixed(1) + " km",
+        color,
+        labelRatio,
+        labelOffsetY
+      ).addTo(map);
 
-  distanceLabels.push(label);
+      distanceLabels.push(label);
 
-  orderPool.push({
-    line: line,
-    distanceKm: distanceKm
-  });
+      orderPool.push({
+        line: line,
+        distanceKm: distanceKm
+      });
 
-  return line;
-}
+      return line;
     }
 
     function applyRouteDisplayPriority(orderPool) {
@@ -635,7 +628,7 @@
         const ownPrice = getOwnPriceFromRow(sheetRow);
 
         const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, 0.12, -165);
+        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, 0.12, -160);
 
         const myPriceData = {
           price: ownPrice.price,
@@ -659,7 +652,7 @@
               const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
               addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
-              addRouteToMap(rivalCoords, YTONG_COLOR, rivalDistanceKm, orderPool, 0.12, -165);
+              addRouteToMap(rivalCoords, YTONG_COLOR, rivalDistanceKm, orderPool, 0.12, -160);
 
               rivalEntries.push({
                 name: "Ytong - " + ytongStartPoint.name,
@@ -688,10 +681,7 @@
           const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
           addMapMarker(rival.coords, rival.name);
-          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, 0.12, -165);
-}
-
-addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, labelRatio, labelOffsetY);
+          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, 0.12, -160);
 
           rivalEntries.push({
             name: rival.name,
