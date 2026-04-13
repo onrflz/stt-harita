@@ -8,59 +8,62 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
+      margin: 12px 16px;
     }
 
     h2 {
-      margin-bottom: 16px;
-      font-size: 24px;
+      margin: 0 0 10px 0;
+      font-size: 22px;
     }
 
     .controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 10px;
       align-items: flex-end;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
     }
 
     .control-group {
       display: flex;
       flex-direction: column;
-      min-width: 240px;
+      min-width: 220px;
       position: relative;
     }
 
     label {
       font-weight: bold;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
+      font-size: 14px;
     }
 
     select, input, button {
-      padding: 10px;
-      font-size: 15px;
+      padding: 9px 10px;
+      font-size: 14px;
+      height: 44px;
+      box-sizing: border-box;
     }
 
     button {
       cursor: pointer;
-      min-width: 140px;
+      min-width: 130px;
     }
 
     #map {
-      height: 500px;
+      height: 420px;
       width: 100%;
-      margin-top: 10px;
+      margin-top: 6px;
     }
 
     #info {
-      margin-top: 15px;
-      line-height: 1.6;
+      margin-top: 10px;
+      line-height: 1.45;
     }
 
     .info-line {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: bold;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     .my-line {
@@ -80,7 +83,7 @@
     }
 
     .kcs-line {
-      color: #1565c0;
+      color: #4da3ff;
     }
 
     .warn-line {
@@ -89,7 +92,7 @@
 
     #suggestions {
       position: absolute;
-      top: 73px;
+      top: 68px;
       left: 0;
       right: 0;
       background: white;
@@ -112,15 +115,23 @@
     }
 
     .distance-label {
-      background: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.96);
       border: 2px solid currentColor;
       border-radius: 14px;
-      padding: 2px 8px;
+      padding: 3px 8px 1px 8px;
       font-size: 12px;
       font-weight: bold;
       white-space: nowrap;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-      transform: translate(-50%, -180%);
+      transform: translate(-50%, -185%);
+      text-align: center;
+      line-height: 1.1;
+    }
+
+    .distance-pointer {
+      font-size: 11px;
+      line-height: 1;
+      margin-top: 1px;
     }
   </style>
 </head>
@@ -164,7 +175,7 @@
     const YTONG_COLOR = "#c79a00";
     const ARKOZ_COLOR = "#c62828";
     const EGE_COLOR = "#1b5e20";
-    const KCS_COLOR = "#1565c0";
+    const KCS_COLOR = "#4da3ff";
     const DISTANCE_LIMIT_KM = 500;
 
     const factories = {
@@ -439,19 +450,19 @@
       return String(value);
     }
 
-    function getOwnPriceFromRow(sheetRow, selectedFactoryKey) {
-      if (!sheetRow) return { price: "", date: "" };
-
-      if (selectedFactoryKey === "corlu") {
+    function getOwnPriceFromRow(sheetRow) {
+      if (!sheetRow) {
         return {
-          price: sheetRow.stt_corlu_fiyat || sheetRow.stt_fiyat || "",
-          date: formatDate(sheetRow.stt_corlu_tarih || sheetRow.stt_tarih || "")
+          price: "",
+          date: "",
+          unit: "TL/ton"
         };
       }
 
       return {
-        price: sheetRow.stt_kirikkale_fiyat || sheetRow.stt_fiyat || "",
-        date: formatDate(sheetRow.stt_kirikkale_tarih || sheetRow.stt_tarih || "")
+        price: sheetRow.stt_fiyat || "",
+        date: formatDate(sheetRow.stt_tarih || ""),
+        unit: sheetRow.birim || "TL/ton"
       };
     }
 
@@ -480,20 +491,16 @@
       return bestRoute;
     }
 
-    function getPriceUnit(selectedFactoryKey, routeType) {
-      if (selectedFactoryKey === "corlu" && (routeType === "mine" || routeType === "ytong")) {
-        return "TL/m3";
-      }
-      return "TL/ton";
-    }
-
     function createDistanceLabel(routeCoords, text, color) {
-      const pointIndex = Math.max(0, Math.floor(routeCoords.length * 0.8) - 1);
+      const pointIndex = Math.max(0, Math.floor(routeCoords.length * 0.80) - 1);
       const point = routeCoords[pointIndex] || routeCoords[Math.floor(routeCoords.length / 2)] || routeCoords[0];
 
       const icon = L.divIcon({
         className: "",
-        html: '<div class="distance-label" style="color:' + color + ';">' + text + '</div>'
+        html: '<div class="distance-label" style="color:' + color + ';">' +
+              text +
+              '<div class="distance-pointer">▼</div>' +
+              '</div>'
       });
 
       const marker = L.marker(point, {
@@ -538,7 +545,7 @@
     }
 
     function renderInfo(myFactoryName, destinationName, myPriceData, rivalEntries, extraWarnings = []) {
-      const myUnit = getPriceUnit(startSelect.value, "mine");
+      const commonUnit = myPriceData.unit || "TL/ton";
 
       let myText =
         "Başlangıç: " + myFactoryName +
@@ -546,7 +553,7 @@
 
       if (myPriceData && myPriceData.price) {
         myText +=
-          " | Nakliye: " + myPriceData.price + " " + myUnit +
+          " | Nakliye: " + myPriceData.price + " " + commonUnit +
           (myPriceData.date ? " | Fiyat Güncelleme Tarihi: " + myPriceData.date : "");
       } else {
         myText += " | Nakliye: TANIMLI DEĞİL";
@@ -555,15 +562,13 @@
       let html = '<div class="info-line my-line">' + myText + '</div>';
 
       rivalEntries.forEach(item => {
-        const unit = getPriceUnit(startSelect.value, item.routeType);
-
         let text =
           "Rakip Çıkış Noktası: " + item.name +
           " | Varış: " + destinationName;
 
         if (item.price) {
           text +=
-            " | Nakliye: " + item.price + " " + unit +
+            " | Nakliye: " + item.price + " " + commonUnit +
             (item.date ? " | Fiyat Güncelleme Tarihi: " + item.date : "");
         } else {
           text += " | Nakliye: TANIMLI DEĞİL";
@@ -614,14 +619,15 @@
         const rivalEntries = [];
 
         const myDistanceKm = myRoute.distance / 1000;
-        const ownPrice = getOwnPriceFromRow(sheetRow, selectedFactoryKey);
+        const ownPrice = getOwnPriceFromRow(sheetRow);
 
         const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
         addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool);
 
         const myPriceData = {
           price: ownPrice.price,
-          date: ownPrice.date
+          date: ownPrice.date,
+          unit: ownPrice.unit
         };
 
         if (!apiHasLokasyonKey) {
@@ -647,8 +653,7 @@
                 distance: rivalDistanceKm.toFixed(1),
                 price: sheetRow.ytong_fiyat || "",
                 date: formatDate(sheetRow.ytong_tarih || ""),
-                cssClass: "rival-line",
-                routeType: "ytong"
+                cssClass: "rival-line"
               });
             }
           }
@@ -677,8 +682,7 @@
             distance: rivalDistanceKm.toFixed(1),
             price: sheetRow ? (sheetRow[rival.priceKey] || "") : "",
             date: sheetRow ? formatDate(sheetRow[rival.dateKey] || "") : "",
-            cssClass: rival.cssClass,
-            routeType: rival.key
+            cssClass: rival.cssClass
           });
         }
 
@@ -695,7 +699,7 @@
         const group = [...routeLayers, ...pointMarkers, ...distanceLabels];
         if (group.length > 0) {
           const featureGroup = L.featureGroup(group);
-          map.fitBounds(featureGroup.getBounds(), { padding: [20, 20] });
+          map.fitBounds(featureGroup.getBounds(), { padding: [18, 18] });
         }
 
         if (!sheetRow) {
