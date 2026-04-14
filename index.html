@@ -128,6 +128,7 @@
     <div class="control-group">
       <label for="startSelect">Başlangıç Noktası</label>
       <select id="startSelect">
+        <option value="" selected disabled>Fabrika seçiniz</option>
         <option value="kirikkale">Kırıkkale Fabrika</option>
         <option value="corlu">Çorlu Fabrika</option>
       </select>
@@ -135,7 +136,7 @@
 
     <div class="control-group">
       <label for="destinationInput">Varış Yeri</label>
-      <input type="text" id="destinationInput" placeholder="Örn: Zile, Tokat" autocomplete="off" />
+      <input type="text" id="destinationInput" placeholder="" autocomplete="off" />
       <div id="suggestions"></div>
     </div>
 
@@ -284,7 +285,7 @@
 
     function resetAll() {
       clearMapLayers();
-      startSelect.value = "kirikkale";
+      startSelect.value = "";
       destinationInput.value = "";
       selectedDestination = null;
       suggestionsBox.innerHTML = "";
@@ -584,6 +585,11 @@
     }
 
     async function renderRoute() {
+      if (!startSelect.value) {
+        infoBox.innerHTML = '<div class="info-line warn-line">Lütfen başlangıç noktası seç.</div>';
+        return;
+      }
+
       if (!selectedDestination) {
         infoBox.innerHTML = "Lütfen varış yeri seç.";
         return;
