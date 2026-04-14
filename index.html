@@ -83,7 +83,15 @@
     }
 
     .kcs-line {
-      color: #8fd3ff;
+      color: #00a8e8;
+    }
+
+    .btg-line {
+      color: #7b1fa2;
+    }
+
+    .cnr-line {
+      color: #ef6c00;
     }
 
     .warn-line {
@@ -175,7 +183,9 @@
     const YTONG_COLOR = "#c79a00";
     const ARKOZ_COLOR = "#c62828";
     const EGE_COLOR = "#1b5e20";
-    const KCS_COLOR = "#8fd3ff";
+    const KCS_COLOR = "#00a8e8";
+    const BTG_COLOR = "#7b1fa2";
+    const CNR_COLOR = "#ef6c00";
     const DISTANCE_LIMIT_KM = 500;
 
     const factories = {
@@ -191,14 +201,15 @@
 
     const rivalStartPoints = {
       bilecik: { name: "Bilecik", coords: [40.28976, 30.01532] },
-      btg: { name: "BTG", coords: [37.02365, 36.12729] },
+      btg: { name: "BTG", coords: [37.02362, 36.12723] },
       dilovasi: { name: "Dilovası", coords: [40.81595, 29.55779] },
       saray: { name: "Saray", coords: [41.41223, 27.83725] },
       catalca: { name: "Çatalca", coords: [41.20506, 28.45473] },
       arkoz: { name: "Arkoz", coords: [41.01296, 35.81233] },
       antalya: { name: "Antalya", coords: [37.09081, 30.61814] },
       ege: { name: "EGE", coords: [38.43196, 27.22032] },
-      kcs: { name: "KÇS", coords: [37.76153, 27.44458] }
+      kcs: { name: "KÇS", coords: [37.76153, 27.44458] },
+      cnr: { name: "ÇNR", coords: [38.37898, 38.17688] }
     };
 
     const limitedRivals = [
@@ -228,6 +239,24 @@
         cssClass: "kcs-line",
         priceKey: "kcs_fiyat",
         dateKey: "kcs_tarih"
+      },
+      {
+        key: "btg",
+        name: "BTG",
+        coords: [37.02362, 36.12723],
+        color: BTG_COLOR,
+        cssClass: "btg-line",
+        priceKey: "btg_fiyat",
+        dateKey: "btg_tarih"
+      },
+      {
+        key: "cnr",
+        name: "ÇNR",
+        coords: [38.37898, 38.17688],
+        color: CNR_COLOR,
+        cssClass: "cnr-line",
+        priceKey: "cnr_fiyat",
+        dateKey: "cnr_tarih"
       }
     ];
 
@@ -517,11 +546,12 @@
       return marker;
     }
 
-    function addRouteToMap(routeCoords, color, distanceKm, orderPool, labelRatio = 0.12, labelOffsetY = -160) {
+    function addRouteToMap(routeCoords, color, distanceKm, orderPool, labelRatio = 0.12, labelOffsetY = -160, dashArray = null, weight = 5) {
       const line = L.polyline(routeCoords, {
         color: color,
-        weight: 5,
-        opacity: 0.95
+        weight: weight,
+        opacity: 0.95,
+        dashArray: dashArray
       }).addTo(map);
 
       routeLayers.push(line);
@@ -628,7 +658,7 @@
         const ownPrice = getOwnPriceFromRow(sheetRow);
 
         const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, 0.12, -160);
+        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, 0.12, -160, null, 6);
 
         const myPriceData = {
           price: ownPrice.price,
@@ -649,18 +679,21 @@
 
             if (rivalRoute) {
               const rivalDistanceKm = rivalRoute.distance / 1000;
-              const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
-              addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
-              addRouteToMap(rivalCoords, YTONG_COLOR, rivalDistanceKm, orderPool, 0.12, -160);
+              if (rivalDistanceKm <= DISTANCE_LIMIT_KM) {
+                const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
-              rivalEntries.push({
-                name: "Ytong - " + ytongStartPoint.name,
-                distance: rivalDistanceKm.toFixed(1),
-                price: sheetRow.ytong_fiyat || "",
-                date: formatDate(sheetRow.ytong_tarih || ""),
-                cssClass: "rival-line"
-              });
+                addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
+                addRouteToMap(rivalCoords, YTONG_COLOR, rivalDistanceKm, orderPool, 0.18, -125, "10,8", 5);
+
+                rivalEntries.push({
+                  name: "Ytong - " + ytongStartPoint.name,
+                  distance: rivalDistanceKm.toFixed(1),
+                  price: sheetRow.ytong_fiyat || "",
+                  date: formatDate(sheetRow.ytong_tarih || ""),
+                  cssClass: "rival-line"
+                });
+              }
             }
           }
         }
@@ -681,7 +714,7 @@
           const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
           addMapMarker(rival.coords, rival.name);
-          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, 0.12, -160);
+          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, 0.18, -125, "10,8", 5);
 
           rivalEntries.push({
             name: rival.name,
