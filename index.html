@@ -674,38 +674,6 @@
         }
 
         if (sheetRow && (sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic)) {
-          const ytongKey = normalizeText(sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic || "");
-          const ytongStartPoint = rivalStartPoints[ytongKey];
-
-          if (ytongStartPoint) {
-            const ytongRoute = await fetchBestRoute(ytongStartPoint.coords, end);
-
-            if (ytongRoute) {
-              const ytongDistanceKm = ytongRoute.distance / 1000;
-
-              if (ytongDistanceKm <= DISTANCE_LIMIT_KM) {
-                const ytongCoords = ytongRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-
-                addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
-                addRouteToMap(ytongCoords, YTONG_COLOR, ytongDistanceKm, orderPool, {
-                  weight: 5,
-                  opacity: 0.9,
-                  dashArray: "12,10",
-                  priority: 1,
-                  labelRatio: 0.18,
-                  labelOffsetY: -125
-                });
-
-                rivalEntries.push({
-                  name: "Ytong - " + ytongStartPoint.name,
-                  price: sheetRow.ytong_fiyat || "",
-                  date: formatDate(sheetRow.ytong_tarih || ""),
-                  cssClass: "rival-line"
-                });
-              }
-            }
-          }
-        }
 
         for (const rival of limitedRivals) {
           const rivalRoute = await fetchBestRoute(rival.coords, end);
