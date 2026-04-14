@@ -618,119 +618,158 @@
     }
 
     async function renderRoute() {
-      if (!selectedDestination) {
-        infoBox.innerHTML = "Lütfen varış yeri seç.";
-        return;
-      }
+  if (!selectedDestination) {
+    infoBox.innerHTML = "Lütfen varış yeri seç.";
+    return;
+  }
 
-      await loadPriceData(true);
+  await loadPriceData(true);
 
-      const selectedFactoryKey = startSelect.value;
-      const selectedFactory = factories[selectedFactoryKey];
-      const start = selectedFactory.coords;
-      const end = [parseFloat(selectedDestination.lat), parseFloat(selectedDestination.lon)];
-      const destinationTextForPricing = destinationInput.value || selectedDestination.display_name || "";
+  const selectedFactoryKey = startSelect.value;
+  const selectedFactory = factories[selectedFactoryKey];
+  const start = selectedFactory.coords;
+  const end = [parseFloat(selectedDestination.lat), parseFloat(selectedDestination.lon)];
+  const destinationTextForPricing = destinationInput.value || selectedDestination.display_name || "";
 
-      clearMapLayers();
+  clearMapLayers();
 
-      addMapMarker(start, selectedFactory.name);
-      addMapMarker(end, selectedDestination.display_name);
+  addMapMarker(start, selectedFactory.name);
+  addMapMarker(end, selectedDestination.display_name);
 
-      infoBox.innerHTML = '<div class="info-line my-line">Mesafe hesaplanıyor...</div>';
+  infoBox.innerHTML = '<div class="info-line my-line">Mesafe hesaplanıyor...</div>';
 
-      try {
-        const sheetRow = findSheetRow(selectedDestination, destinationTextForPricing, selectedFactoryKey);
-        const myRoute = await fetchBestRoute(start, end);
+  try {
+    const sheetRow = findSheetRow(selectedDestination, destinationTextForPricing, selectedFactoryKey);
+    const myRoute = await fetchBestRoute(start, end);
 
-        if (!myRoute) {
-          infoBox.innerHTML = "Rota bulunamadı.";
-          return;
-        }
+    if (!myRoute) {
+      infoBox.innerHTML = "Rota bulunamadı.";
+      return;
+    }
 
-        const orderPool = [];
-        const warnings = [];
-        const rivalEntries = [];
+    const orderPool = [];
+    const warnings = [];
+    const rivalEntries = [];
 
-        const myDistanceKm = myRoute.distance / 1000;
-        const ownPrice = getOwnPriceFromRow(sheetRow);
+    const myDistanceKm = myRoute.distance / 1000;
+    const ownPrice = getOwnPriceFromRow(sheetRow);
 
-        const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, {
-          weight: 6,
-          opacity: 0.95,
-          priority: 2,
-          labelRatio: 0.12,
-          labelOffsetY: -160
-        });
+    const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+    addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, {
+      weight: 6,
+      opacity: 0.95,
+      priority: 2,
+      labelRatio: 0.12,
+      labelOffsetY: -160
+    });
 
-        const myPriceData = {
-          price: ownPrice.price,
-          date: ownPrice.date,
-          unit: ownPrice.unit
-        };
+    const myPriceData = {
+      price: ownPrice.price,
+      date: ownPrice.date,
+      unit: ownPrice.unit
+    };
 
-        if (!apiHasLokasyonKey) {
-          warnings.push("Uyarı: API çıktısında lokasyon_key alanı görünmüyor. App Script eski deployment olabilir.");
-        }
+    if (!apiHasLokasyonKey) {
+      warnings.push("Uyarı: API çıktısında lokasyon_key alanı görünmüyor. App Script eski deployment olabilir.");
+    }
 
-        if (sheetRow && (sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic)) {
+    // YTONG
+    if (sheetRow && (sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic)) {
+      const ytongKey = normalizeText(
+        sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic || ""
+      );
 
-        for (const rival of limitedRivals) {
-          const rivalRoute = await fetchBestRoute(rival.coords, end);
+      const ytongStartPoint = rivalStartPoints[ytongKey];
 
-          if (!rivalRoute) continue;
+      if (ytongStartPoint) {
+        const ytongRoute = await fetchBestRoute(ytongStartPoint.coords, end);
 
-          const rivalDistanceKm = rivalRoute.distance / 1000;
+        if (ytongRoute) {
+          const ytongDistanceKm = ytongRoute.distance / 1000;
 
-          if (rivalDistanceKm > DISTANCE_LIMIT_KM) {
-            continue;
+          if (ytongDistanceKm <= DISTANCE_LIMIT_KM) {
+            const ytongCoords = ytongRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+
+            addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
+            addRouteToMap(ytongCoords, YTONG_COLOR, ytongDistanceKm, orderPool, {
+              weight: 5,
+              opacity: 0.9,
+              dashArray: "12,10",
+              priority: 1,
+              labelRatio: 0.18,
+              labelOffsetY: -125
+            });
+
+            rivalEntries.push({
+              name: "Ytong - " + ytongStartPoint.name,
+              price: sheetRow.ytong_fiyat || "",
+              date: formatDate(sheetRow.ytong_tarih || ""),
+              cssClass: "rival-line"
+            });
           }
-
-          const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-
-          addMapMarker(rival.coords, rival.name);
-          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, {
-            weight: 5,
-            opacity: 0.9,
-            dashArray: "10,8",
-            priority: 1,
-            labelRatio: 0.18,
-            labelOffsetY: -125
-          });
-
-          rivalEntries.push({
-            name: rival.name,
-            price: sheetRow ? (sheetRow[rival.priceKey] || "") : "",
-            date: sheetRow ? formatDate(sheetRow[rival.dateKey] || "") : "",
-            cssClass: rival.cssClass
-          });
         }
-
-        applyRouteDisplayPriority(orderPool);
-
-        renderInfo(
-          selectedFactory.name,
-          selectedDestination.display_name,
-          myPriceData,
-          rivalEntries,
-          warnings
-        );
-
-        const group = [...routeLayers, ...pointMarkers, ...distanceLabels];
-        if (group.length > 0) {
-          const featureGroup = L.featureGroup(group);
-          map.fitBounds(featureGroup.getBounds(), { padding: [18, 18] });
-        }
-
-        if (!sheetRow) {
-          infoBox.innerHTML += '<div class="info-line warn-line">Uyarı: Sheet içinde bu varış yeri için eşleşen satır bulunamadı.</div>';
-        }
-
-      } catch (error) {
-        console.error(error);
-        infoBox.innerHTML = "Hata oluştu: rota verisi veya fiyat verisi alınamadı.";
       }
     }
+
+    // DİĞER RAKİPLER
+    for (const rival of limitedRivals) {
+      const rivalRoute = await fetchBestRoute(rival.coords, end);
+
+      if (!rivalRoute) {
+        continue;
+      }
+
+      const rivalDistanceKm = rivalRoute.distance / 1000;
+
+      if (rivalDistanceKm > DISTANCE_LIMIT_KM) {
+        continue;
+      }
+
+      const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+
+      addMapMarker(rival.coords, rival.name);
+      addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, {
+        weight: 5,
+        opacity: 0.9,
+        dashArray: "10,8",
+        priority: 1,
+        labelRatio: 0.18,
+        labelOffsetY: -125
+      });
+
+      rivalEntries.push({
+        name: rival.name,
+        price: sheetRow ? (sheetRow[rival.priceKey] || "") : "",
+        date: sheetRow ? formatDate(sheetRow[rival.dateKey] || "") : "",
+        cssClass: rival.cssClass
+      });
+    }
+
+    applyRouteDisplayPriority(orderPool);
+
+    renderInfo(
+      selectedFactory.name,
+      selectedDestination.display_name,
+      myPriceData,
+      rivalEntries,
+      warnings
+    );
+
+    const group = [...routeLayers, ...pointMarkers, ...distanceLabels];
+    if (group.length > 0) {
+      const featureGroup = L.featureGroup(group);
+      map.fitBounds(featureGroup.getBounds(), { padding: [18, 18] });
+    }
+
+    if (!sheetRow) {
+      infoBox.innerHTML += '<div class="info-line warn-line">Uyarı: Sheet içinde bu varış yeri için eşleşen satır bulunamadı.</div>';
+    }
+
+  } catch (error) {
+    console.error(error);
+    infoBox.innerHTML = "Hata oluştu: rota verisi veya fiyat verisi alınamadı.";
+  }
+}
 
     let searchTimeout = null;
 
