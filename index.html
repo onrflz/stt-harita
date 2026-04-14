@@ -66,37 +66,14 @@
       margin-bottom: 4px;
     }
 
-    .my-line {
-      color: #0b3d91;
-    }
-
-    .rival-line {
-      color: #c79a00;
-    }
-
-    .arkoz-line {
-      color: #c62828;
-    }
-
-    .ege-line {
-      color: #1b5e20;
-    }
-
-    .kcs-line {
-      color: #00a8e8;
-    }
-
-    .btg-line {
-      color: #7b1fa2;
-    }
-
-    .cnr-line {
-      color: #ef6c00;
-    }
-
-    .warn-line {
-      color: #b00020;
-    }
+    .my-line { color: #0b3d91; }
+    .rival-line { color: #c79a00; }
+    .arkoz-line { color: #c62828; }
+    .ege-line { color: #1b5e20; }
+    .kcs-line { color: #00a8e8; }
+    .btg-line { color: #7b1fa2; }
+    .cnr-line { color: #ef6c00; }
+    .warn-line { color: #b00020; }
 
     #suggestions {
       position: absolute;
@@ -331,13 +308,11 @@
 
       priceData = data.map(row => {
         const newRow = { ...row };
-
         Object.keys(newRow).forEach(key => {
           if (typeof newRow[key] === "string") {
             newRow[key] = newRow[key].trim();
           }
         });
-
         return newRow;
       });
 
@@ -353,9 +328,7 @@
 
       priceData.forEach(row => {
         const ilValue = normalizeText(row.il_normalized || row.il || "");
-        if (ilValue) {
-          set.add(ilValue);
-        }
+        if (ilValue) set.add(ilValue);
       });
 
       return Array.from(set);
@@ -374,9 +347,7 @@
         address.municipality,
         address.suburb,
         address.village
-      ]
-      .map(x => normalizeText(x))
-      .filter(Boolean);
+      ].map(x => normalizeText(x)).filter(Boolean);
     }
 
     function getDisplayParts(text) {
@@ -413,11 +384,7 @@
         districtKey = firstPart;
       }
 
-      return {
-        province,
-        districtKey,
-        displayText
-      };
+      return { province, districtKey, displayText };
     }
 
     function getFactoryMatchedRows(rows, selectedFactoryKey) {
@@ -439,9 +406,7 @@
         normalizeText(row.il_normalized || row.il || "") === resolved.province
       );
 
-      if (provinceRows.length === 0) {
-        return null;
-      }
+      if (provinceRows.length === 0) return null;
 
       const factoryRows = getFactoryMatchedRows(provinceRows, selectedFactoryKey);
 
@@ -449,7 +414,6 @@
         const exactDistrictRows = factoryRows.filter(row =>
           normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === resolved.districtKey
         );
-
         if (exactDistrictRows.length > 0) {
           return exactDistrictRows[0];
         }
@@ -481,11 +445,7 @@
 
     function getOwnPriceFromRow(sheetRow) {
       if (!sheetRow) {
-        return {
-          price: "",
-          date: "",
-          unit: "TL/ton"
-        };
+        return { price: "", date: "", unit: "TL/ton" };
       }
 
       return {
@@ -510,7 +470,6 @@
       }
 
       let bestRoute = data.routes[0];
-
       for (let i = 1; i < data.routes.length; i++) {
         if (data.routes[i].distance < bestRoute.distance) {
           bestRoute = data.routes[i];
@@ -546,12 +505,12 @@
       return marker;
     }
 
-    function addRouteToMap(routeCoords, color, distanceKm, orderPool, labelRatio = 0.12, labelOffsetY = -160, dashArray = null, weight = 5) {
+    function addRouteToMap(routeCoords, color, distanceKm, orderPool, options = {}) {
       const line = L.polyline(routeCoords, {
         color: color,
-        weight: weight,
-        opacity: 0.95,
-        dashArray: dashArray
+        weight: options.weight ?? 5,
+        opacity: options.opacity ?? 0.95,
+        dashArray: options.dashArray || null
       }).addTo(map);
 
       routeLayers.push(line);
@@ -560,15 +519,16 @@
         routeCoords,
         distanceKm.toFixed(1) + " km",
         color,
-        labelRatio,
-        labelOffsetY
+        options.labelRatio ?? 0.12,
+        options.labelOffsetY ?? -160
       ).addTo(map);
 
       distanceLabels.push(label);
 
       orderPool.push({
         line: line,
-        distanceKm: distanceKm
+        distanceKm: distanceKm,
+        priority: options.priority ?? 1
       });
 
       return line;
@@ -576,7 +536,10 @@
 
     function applyRouteDisplayPriority(orderPool) {
       orderPool
-        .sort((a, b) => b.distanceKm - a.distanceKm)
+        .sort((a, b) => {
+          if (a.priority !== b.priority) return a.priority - b.priority;
+          return b.distanceKm - a.distanceKm;
+        })
         .forEach(item => item.line.bringToFront());
     }
 
@@ -658,7 +621,13 @@
         const ownPrice = getOwnPriceFromRow(sheetRow);
 
         const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, 0.12, -160, null, 6);
+        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, {
+          weight: 6,
+          opacity: 0.95,
+          priority: 2,
+          labelRatio: 0.12,
+          labelOffsetY: -160
+        });
 
         const myPriceData = {
           price: ownPrice.price,
@@ -675,20 +644,27 @@
           const ytongStartPoint = rivalStartPoints[ytongKey];
 
           if (ytongStartPoint) {
-            const rivalRoute = await fetchBestRoute(ytongStartPoint.coords, end);
+            const ytongRoute = await fetchBestRoute(ytongStartPoint.coords, end);
 
-            if (rivalRoute) {
-              const rivalDistanceKm = rivalRoute.distance / 1000;
+            if (ytongRoute) {
+              const ytongDistanceKm = ytongRoute.distance / 1000;
 
-              if (rivalDistanceKm <= DISTANCE_LIMIT_KM) {
-                const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+              if (ytongDistanceKm <= DISTANCE_LIMIT_KM) {
+                const ytongCoords = ytongRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
                 addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
-                addRouteToMap(rivalCoords, YTONG_COLOR, rivalDistanceKm, orderPool, 0.18, -125, "10,8", 5);
+                addRouteToMap(ytongCoords, YTONG_COLOR, ytongDistanceKm, orderPool, {
+                  weight: 5,
+                  opacity: 0.9,
+                  dashArray: "10,8",
+                  priority: 1,
+                  labelRatio: 0.18,
+                  labelOffsetY: -125
+                });
 
                 rivalEntries.push({
                   name: "Ytong - " + ytongStartPoint.name,
-                  distance: rivalDistanceKm.toFixed(1),
+                  distance: ytongDistanceKm.toFixed(1),
                   price: sheetRow.ytong_fiyat || "",
                   date: formatDate(sheetRow.ytong_tarih || ""),
                   cssClass: "rival-line"
@@ -701,9 +677,7 @@
         for (const rival of limitedRivals) {
           const rivalRoute = await fetchBestRoute(rival.coords, end);
 
-          if (!rivalRoute) {
-            continue;
-          }
+          if (!rivalRoute) continue;
 
           const rivalDistanceKm = rivalRoute.distance / 1000;
 
@@ -714,7 +688,14 @@
           const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
           addMapMarker(rival.coords, rival.name);
-          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, 0.18, -125, "10,8", 5);
+          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, {
+            weight: 5,
+            opacity: 0.9,
+            dashArray: "10,8",
+            priority: 1,
+            labelRatio: 0.18,
+            labelOffsetY: -125
+          });
 
           rivalEntries.push({
             name: rival.name,
