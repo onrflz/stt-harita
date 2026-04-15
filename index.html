@@ -73,6 +73,7 @@
     .kcs-line { color: #00a8e8; }
     .btg-line { color: #7b1fa2; }
     .cnr-line { color: #ef6c00; }
+    .nuh-line { color: #6d4c41; }
     .warn-line { color: #b00020; }
 
     #suggestions {
@@ -164,6 +165,7 @@
     const KCS_COLOR = "#00a8e8";
     const BTG_COLOR = "#7b1fa2";
     const CNR_COLOR = "#ef6c00";
+    const NUH_COLOR = "#6d4c41";
     const DISTANCE_LIMIT_KM = 500;
 
     const factories = {
@@ -187,7 +189,8 @@
       antalya: { name: "Antalya", coords: [37.09081, 30.61814] },
       ege: { name: "EGE", coords: [38.43196, 27.22032] },
       kcs: { name: "KÇS", coords: [37.76153, 27.44458] },
-      cnr: { name: "ÇNR", coords: [38.37898, 38.17688] }
+      cnr: { name: "ÇNR", coords: [38.37898, 38.17688] },
+      nuh: { name: "NUH", coords: [40.79563, 29.59402] }
     };
 
     const limitedRivals = [
@@ -235,6 +238,15 @@
         cssClass: "cnr-line",
         priceKey: "cnr_fiyat",
         dateKey: "cnr_tarih"
+      },
+      {
+        key: "nuh",
+        name: "NUH",
+        coords: [40.79563, 29.59402],
+        color: NUH_COLOR,
+        cssClass: "nuh-line",
+        priceKey: "nuh_fiyat",
+        dateKey: "nuh_tarih"
       }
     ];
 
