@@ -73,7 +73,6 @@
     .kcs-line { color: #00a8e8; }
     .btg-line { color: #7b1fa2; }
     .cnr-line { color: #ef6c00; }
-    .nuh-line { color: #6d4c41; }
     .warn-line { color: #b00020; }
 
     #suggestions {
@@ -101,24 +100,26 @@
     }
 
     .distance-label {
-      background: rgba(255, 255, 255, 0.96);
-      border: 2px solid currentColor;
-      border-radius: 14px;
-      padding: 3px 8px 1px 8px;
-      font-size: 12px;
-      font-weight: bold;
-      white-space: nowrap;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-      text-align: center;
-      line-height: 1.1;
-    }
+  background: rgba(255, 255, 255, 0.96);
+  border: 2px solid currentColor;
+  border-radius: 18px;
+  padding: 6px 14px 4px 14px;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  line-height: 1.2;
+  min-width: 78px;
+  display: inline-block;
+}
 
-    .distance-pointer {
-      display: block;
-      font-size: 11px;
-      line-height: 1;
-      margin-top: 1px;
-    }
+.distance-pointer {
+  display: block;
+  font-size: 12px;
+  line-height: 1;
+  margin-top: 2px;
+}
   </style>
 </head>
 <body>
@@ -165,7 +166,6 @@
     const KCS_COLOR = "#00a8e8";
     const BTG_COLOR = "#7b1fa2";
     const CNR_COLOR = "#ef6c00";
-    const NUH_COLOR = "#6d4c41";
     const DISTANCE_LIMIT_KM = 500;
 
     const factories = {
@@ -189,8 +189,7 @@
       antalya: { name: "Antalya", coords: [37.09081, 30.61814] },
       ege: { name: "EGE", coords: [38.43196, 27.22032] },
       kcs: { name: "KÇS", coords: [37.76153, 27.44458] },
-      cnr: { name: "ÇNR", coords: [38.37898, 38.17688] },
-      nuh: { name: "NUH", coords: [40.79563, 29.59402] }
+      cnr: { name: "ÇNR", coords: [38.37898, 38.17688] }
     };
 
     const limitedRivals = [
@@ -238,15 +237,6 @@
         cssClass: "cnr-line",
         priceKey: "cnr_fiyat",
         dateKey: "cnr_tarih"
-      },
-      {
-        key: "nuh",
-        name: "NUH",
-        coords: [40.79563, 29.59402],
-        color: NUH_COLOR,
-        cssClass: "nuh-line",
-        priceKey: "nuh_fiyat",
-        dateKey: "nuh_tarih"
       }
     ];
 
