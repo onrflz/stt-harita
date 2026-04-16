@@ -100,24 +100,38 @@
       background: #f2f2f2;
     }
 
+    .distance-label-wrap {
+      position: relative;
+      transform: translate(-50%, -120%);
+      pointer-events: none;
+    }
+
     .distance-label {
-      background: rgba(255, 255, 255, 0.96);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 84px;
+      height: 34px;
+      padding: 0 14px;
+      background: rgba(255, 255, 255, 0.97);
       border: 2px solid currentColor;
-      border-radius: 14px;
-      padding: 3px 8px 1px 8px;
-      font-size: 12px;
+      border-radius: 999px;
+      font-size: 13px;
       font-weight: bold;
       white-space: nowrap;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
       text-align: center;
-      line-height: 1.1;
+      line-height: 1;
+      box-sizing: border-box;
     }
 
     .distance-pointer {
-      display: block;
-      font-size: 11px;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 27px;
+      font-size: 14px;
       line-height: 1;
-      margin-top: 1px;
     }
   </style>
 </head>
@@ -168,6 +182,8 @@
     const NUH_COLOR = "#6d4c41";
     const DISTANCE_LIMIT_KM = 500;
 
+    const PRICE_CACHE_MS = 5 * 60 * 1000;
+
     const factories = {
       kirikkale: {
         name: "Kırıkkale Fabrika",
@@ -191,6 +207,20 @@
       kcs: { name: "KÇS", coords: [37.76153, 27.44458] },
       cnr: { name: "ÇNR", coords: [38.37898, 38.17688] },
       nuh: { name: "NUH", coords: [40.79563, 29.59402] }
+    };
+
+    const rivalAliases = {
+      bilecik: ["bilecik", "bilecik fabrika", "ytong bilecik"],
+      btg: ["btg", "btg fabrika"],
+      dilovasi: ["dilovasi", "dilovası", "dilovasi fabrika", "dilovası fabrika"],
+      saray: ["saray", "saray fabrika", "ytong saray"],
+      catalca: ["catalca", "çatalca", "catalca fabrika", "çatalca fabrika"],
+      arkoz: ["arkoz", "arkoz fabrika"],
+      antalya: ["antalya", "antalya fabrika", "ytong antalya", "antalya ytong"],
+      ege: ["ege", "ege fabrika"],
+      kcs: ["kcs", "kçs", "kcs fabrika", "kçs fabrika"],
+      cnr: ["cnr", "çnr", "cnr fabrika", "çnr fabrika"],
+      nuh: ["nuh", "nuh fabrika"]
     };
 
     const limitedRivals = [
@@ -253,10 +283,13 @@
     let priceData = [];
     let selectedDestination = null;
     let apiHasLokasyonKey = false;
+    let lastPriceLoadAt = 0;
 
     let routeLayers = [];
     let pointMarkers = [];
     let distanceLabels = [];
+
+    const routeCache = new Map();
 
     const startSelect = document.getElementById("startSelect");
     const destinationInput = document.getElementById("destinationInput");
@@ -307,7 +340,11 @@
     }
 
     async function loadPriceData(forceReload = false) {
-      if (!forceReload && priceData.length > 0) return priceData;
+      const isCacheFresh = (Date.now() - lastPriceLoadAt) < PRICE_CACHE_MS;
+
+      if (!forceReload && priceData.length > 0 && isCacheFresh) {
+        return priceData;
+      }
 
       const cacheBreaker = "t=" + Date.now();
       const url = PRICE_API_URL + (PRICE_API_URL.includes("?") ? "&" : "?") + cacheBreaker;
@@ -333,6 +370,7 @@
         normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") !== ""
       );
 
+      lastPriceLoadAt = Date.now();
       return priceData;
     }
 
@@ -410,6 +448,39 @@
       return matched.length > 0 ? matched : rows;
     }
 
+    function getRowCompletenessScore(row) {
+      const keys = [
+        "stt_fiyat", "stt_tarih", "stt_baslangic",
+        "ytong_baslangic", "ytong_fiyat", "ytong_tarih",
+        "arkoz_fiyat", "arkoz_tarih",
+        "ege_fiyat", "ege_tarih",
+        "kcs_fiyat", "kcs_tarih",
+        "btg_fiyat", "btg_tarih",
+        "cnr_fiyat", "cnr_tarih",
+        "nuh_fiyat", "nuh_tarih"
+      ];
+
+      return keys.reduce((score, key) => {
+        return score + (String(row[key] || "").trim() !== "" ? 1 : 0);
+      }, 0);
+    }
+
+    function pickBestRow(rows) {
+      if (!rows || rows.length === 0) return null;
+
+      return [...rows].sort((a, b) => {
+        const lokA = normalizeText(a.lokasyon_key_normalized || a.lokasyon_key || "");
+        const lokB = normalizeText(b.lokasyon_key_normalized || b.lokasyon_key || "");
+        const scoreA = getRowCompletenessScore(a);
+        const scoreB = getRowCompletenessScore(b);
+
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        if (lokA === "" && lokB !== "") return -1;
+        if (lokA !== "" && lokB === "") return 1;
+        return 0;
+      })[0];
+    }
+
     function findSheetRow(destinationObj, inputText, selectedFactoryKey) {
       const resolved = resolveDestinationForSheet(destinationObj, inputText);
 
@@ -428,7 +499,15 @@
           normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === resolved.districtKey
         );
         if (exactDistrictRows.length > 0) {
-          return exactDistrictRows[0];
+          return pickBestRow(exactDistrictRows);
+        }
+
+        const containsDistrictRows = factoryRows.filter(row => {
+          const lokasyon = normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "");
+          return lokasyon && (lokasyon.includes(resolved.districtKey) || resolved.districtKey.includes(lokasyon));
+        });
+        if (containsDistrictRows.length > 0) {
+          return pickBestRow(containsDistrictRows);
         }
       }
 
@@ -437,10 +516,10 @@
       );
 
       if (blankLokasyonRows.length > 0) {
-        return blankLokasyonRows[0];
+        return pickBestRow(blankLokasyonRows);
       }
 
-      return factoryRows[0] || null;
+      return pickBestRow(factoryRows);
     }
 
     function formatDate(value) {
@@ -468,40 +547,51 @@
       };
     }
 
+    function getRouteCacheKey(start, end) {
+      return [
+        Number(start[0]).toFixed(6),
+        Number(start[1]).toFixed(6),
+        Number(end[0]).toFixed(6),
+        Number(end[1]).toFixed(6)
+      ].join("|");
+    }
+
     async function fetchBestRoute(start, end) {
+      const cacheKey = getRouteCacheKey(start, end);
+
+      if (routeCache.has(cacheKey)) {
+        return routeCache.get(cacheKey);
+      }
+
       const url =
         "https://router.project-osrm.org/route/v1/driving/" +
         start[1] + "," + start[0] + ";" +
         end[1] + "," + end[0] +
-        "?alternatives=true&overview=full&geometries=geojson";
+        "?overview=full&geometries=geojson";
 
       const response = await fetch(url);
       const data = await response.json();
 
       if (!data.routes || data.routes.length === 0) {
+        routeCache.set(cacheKey, null);
         return null;
       }
 
-      let bestRoute = data.routes[0];
-      for (let i = 1; i < data.routes.length; i++) {
-        if (data.routes[i].distance < bestRoute.distance) {
-          bestRoute = data.routes[i];
-        }
-      }
-
+      const bestRoute = data.routes[0];
+      routeCache.set(cacheKey, bestRoute);
       return bestRoute;
     }
 
-    function createDistanceLabel(routeCoords, text, color, ratio = 0.12, offsetY = -160) {
+    function createDistanceLabel(routeCoords, text, color, ratio = 0.14) {
       const pointIndex = Math.max(1, Math.floor(routeCoords.length * ratio));
       const point = routeCoords[pointIndex] || routeCoords[1] || routeCoords[0];
 
       const icon = L.divIcon({
         className: "",
         html:
-          '<div class="distance-label" style="color:' + color + '; transform: translate(-50%, ' + offsetY + '%);">' +
-            text +
-            '<span class="distance-pointer">&#9660;</span>' +
+          '<div class="distance-label-wrap" style="color:' + color + ';">' +
+            '<div class="distance-label">' + text + '</div>' +
+            '<div class="distance-pointer">&#9660;</div>' +
           '</div>'
       });
 
@@ -532,8 +622,7 @@
         routeCoords,
         distanceKm.toFixed(1) + " km",
         color,
-        options.labelRatio ?? 0.12,
-        options.labelOffsetY ?? -160
+        options.labelRatio ?? 0.14
       ).addTo(map);
 
       distanceLabels.push(label);
@@ -596,6 +685,30 @@
       infoBox.innerHTML = html;
     }
 
+    function resolveRivalStartPoint(rawValue) {
+      const normalized = normalizeText(rawValue || "");
+      if (!normalized) return null;
+
+      for (const [key, point] of Object.entries(rivalStartPoints)) {
+        if (normalizeText(key) === normalized) return point;
+        if (normalizeText(point.name) === normalized) return point;
+      }
+
+      for (const [key, aliases] of Object.entries(rivalAliases)) {
+        if (aliases.some(alias => normalizeText(alias) === normalized)) {
+          return rivalStartPoints[key] || null;
+        }
+      }
+
+      for (const [key, aliases] of Object.entries(rivalAliases)) {
+        if (aliases.some(alias => normalized.includes(normalizeText(alias)) || normalizeText(alias).includes(normalized))) {
+          return rivalStartPoints[key] || null;
+        }
+      }
+
+      return null;
+    }
+
     async function renderRoute() {
       if (!startSelect.value) {
         infoBox.innerHTML = '<div class="info-line warn-line">Lütfen başlangıç noktası seç.</div>';
@@ -607,24 +720,51 @@
         return;
       }
 
-      await loadPriceData(true);
-
-      const selectedFactoryKey = startSelect.value;
-      const selectedFactory = factories[selectedFactoryKey];
-      const start = selectedFactory.coords;
-      const end = [parseFloat(selectedDestination.lat), parseFloat(selectedDestination.lon)];
-      const destinationTextForPricing = destinationInput.value || selectedDestination.display_name || "";
-
-      clearMapLayers();
-
-      addMapMarker(start, selectedFactory.name);
-      addMapMarker(end, selectedDestination.display_name);
-
-      infoBox.innerHTML = '<div class="info-line my-line">Mesafe hesaplanıyor...</div>';
+      calculateBtn.disabled = true;
+      calculateBtn.textContent = "Hesaplanıyor...";
 
       try {
+        await loadPriceData(false);
+
+        const selectedFactoryKey = startSelect.value;
+        const selectedFactory = factories[selectedFactoryKey];
+        const start = selectedFactory.coords;
+        const end = [parseFloat(selectedDestination.lat), parseFloat(selectedDestination.lon)];
+        const destinationTextForPricing = destinationInput.value || selectedDestination.display_name || "";
+
+        clearMapLayers();
+
+        addMapMarker(start, selectedFactory.name);
+        addMapMarker(end, selectedDestination.display_name);
+
+        infoBox.innerHTML = '<div class="info-line my-line">Mesafe hesaplanıyor...</div>';
+
         const sheetRow = findSheetRow(selectedDestination, destinationTextForPricing, selectedFactoryKey);
-        const myRoute = await fetchBestRoute(start, end);
+
+        const myRoutePromise = fetchBestRoute(start, end);
+
+        let ytongPromise = null;
+        let ytongStartPoint = null;
+        let rawYtongStartValue = "";
+
+        if (sheetRow && (sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic)) {
+          rawYtongStartValue = sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic || "";
+          ytongStartPoint = resolveRivalStartPoint(rawYtongStartValue);
+
+          if (ytongStartPoint) {
+            ytongPromise = fetchBestRoute(ytongStartPoint.coords, end);
+          }
+        }
+
+        const rivalPromises = limitedRivals.map(rival =>
+          fetchBestRoute(rival.coords, end).then(route => ({ rival, route }))
+        );
+
+        const [myRoute, ytongRoute, rivalResults] = await Promise.all([
+          myRoutePromise,
+          ytongPromise ? ytongPromise : Promise.resolve(null),
+          Promise.all(rivalPromises)
+        ]);
 
         if (!myRoute) {
           infoBox.innerHTML = "Rota bulunamadı.";
@@ -643,8 +783,7 @@
           weight: 6,
           opacity: 0.95,
           priority: 2,
-          labelRatio: 0.12,
-          labelOffsetY: -160
+          labelRatio: 0.12
         });
 
         const myPriceData = {
@@ -657,53 +796,44 @@
           warnings.push("Uyarı: API çıktısında lokasyon_key alanı görünmüyor. App Script eski deployment olabilir.");
         }
 
-        if (sheetRow && (sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic)) {
-          const ytongKey = normalizeText(sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic || "");
-          const ytongStartPoint = rivalStartPoints[ytongKey];
+        if (sheetRow && rawYtongStartValue && !ytongStartPoint) {
+          warnings.push("Uyarı: Ytong başlangıç noktası çözülemedi: " + rawYtongStartValue);
+        }
 
-          if (ytongStartPoint) {
-            const ytongRoute = await fetchBestRoute(ytongStartPoint.coords, end);
+        if (ytongStartPoint && ytongRoute) {
+          const ytongDistanceKm = ytongRoute.distance / 1000;
 
-            if (ytongRoute) {
-              const ytongDistanceKm = ytongRoute.distance / 1000;
+          if (ytongDistanceKm <= DISTANCE_LIMIT_KM) {
+            const ytongCoords = ytongRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
-              if (ytongDistanceKm <= DISTANCE_LIMIT_KM) {
-                const ytongCoords = ytongRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+            addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
+            addRouteToMap(ytongCoords, YTONG_COLOR, ytongDistanceKm, orderPool, {
+              weight: 5,
+              opacity: 0.9,
+              dashArray: "10,8",
+              priority: 1,
+              labelRatio: 0.18
+            });
 
-                addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
-                addRouteToMap(ytongCoords, YTONG_COLOR, ytongDistanceKm, orderPool, {
-                  weight: 5,
-                  opacity: 0.9,
-                  dashArray: "10,8",
-                  priority: 1,
-                  labelRatio: 0.18,
-                  labelOffsetY: -125
-                });
-
-                rivalEntries.push({
-                  name: "Ytong - " + ytongStartPoint.name,
-                  distance: ytongDistanceKm.toFixed(1),
-                  price: sheetRow.ytong_fiyat || "",
-                  date: formatDate(sheetRow.ytong_tarih || ""),
-                  cssClass: "rival-line"
-                });
-              }
-            }
+            rivalEntries.push({
+              name: "Ytong - " + ytongStartPoint.name,
+              distance: ytongDistanceKm.toFixed(1),
+              price: sheetRow.ytong_fiyat || "",
+              date: formatDate(sheetRow.ytong_tarih || ""),
+              cssClass: "rival-line"
+            });
+          } else {
+            warnings.push("Ytong rotası 500 km sınırını aştığı için gösterilmedi.");
           }
         }
 
-        for (const rival of limitedRivals) {
-          const rivalRoute = await fetchBestRoute(rival.coords, end);
+        rivalResults.forEach(({ rival, route }) => {
+          if (!route) return;
 
-          if (!rivalRoute) continue;
+          const rivalDistanceKm = route.distance / 1000;
+          if (rivalDistanceKm > DISTANCE_LIMIT_KM) return;
 
-          const rivalDistanceKm = rivalRoute.distance / 1000;
-
-          if (rivalDistanceKm > DISTANCE_LIMIT_KM) {
-            continue;
-          }
-
-          const rivalCoords = rivalRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+          const rivalCoords = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
           addMapMarker(rival.coords, rival.name);
           addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, {
@@ -711,8 +841,7 @@
             opacity: 0.9,
             dashArray: "10,8",
             priority: 1,
-            labelRatio: 0.18,
-            labelOffsetY: -125
+            labelRatio: 0.18
           });
 
           rivalEntries.push({
@@ -722,7 +851,7 @@
             date: sheetRow ? formatDate(sheetRow[rival.dateKey] || "") : "",
             cssClass: rival.cssClass
           });
-        }
+        });
 
         applyRouteDisplayPriority(orderPool);
 
@@ -747,6 +876,9 @@
       } catch (error) {
         console.error(error);
         infoBox.innerHTML = "Hata oluştu: rota verisi veya fiyat verisi alınamadı.";
+      } finally {
+        calculateBtn.disabled = false;
+        calculateBtn.textContent = "Hesapla";
       }
     }
 
