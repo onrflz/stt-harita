@@ -1,144 +1,990 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>Fabrika → Varış Yeri Mesafe Hesaplama</title>
+  <meta charset="utf-8" />
+  <title>Fabrika → Varış Yeri Mesafe Hesaplama</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 12px 16px;
+    }
 
-<style>
+    h2 {
+      margin: 0 0 10px 0;
+      font-size: 22px;
+    }
 
-/* GENEL */
-body {
-  font-family: Arial, sans-serif;
-  margin: 10px;
-}
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-end;
+      margin-bottom: 10px;
+    }
 
-h2 {
-  font-size: 0.85em;
-  margin-bottom: 5px;
-  margin-top: 0;
-}
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      min-width: 220px;
+      position: relative;
+    }
 
-.controls {
-  display: flex;
-  gap: 6px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  margin-bottom: 5px;
-}
+    label {
+      font-weight: bold;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
 
-.controls > div {
-  display: flex;
-  flex-direction: column;
-  gap: 0;                  /* tamamen kapat */
-}
+    select, input, button {
+      padding: 9px 10px;
+      font-size: 14px;
+      height: 44px;
+      box-sizing: border-box;
+    }
 
-label {
-  display: block;
-  font-size: 0.8em;
-  margin: 0;               /* tüm marginleri sıfırla */
-  padding: 0;              /* padding sıfırla */
-  line-height: 1;          /* satır yüksekliğini sıkıştır */
-}
+    button {
+      cursor: pointer;
+      min-width: 130px;
+    }
 
-select,
-input,
-button {
-  font-size: 0.8em;
-  padding: 4px 6px;
-  height: 30px;
-  box-sizing: border-box;
-  margin-top: 0;           /* ekstra üst boşluk kalmasın */
-}
+    #map {
+      height: 420px;
+      width: 100%;
+      margin-top: 6px;
+    }
 
-/* TEK TEK GENİŞLİKLER */
-#start {
-  width: 110px;
-}
+    #info {
+      margin-top: 10px;
+      line-height: 1.45;
+    }
 
-#end {
-  width: 140px;
-}
+    .info-line {
+      font-size: 13px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
 
-button {
-  width: 90px;
-  white-space: nowrap;
-}
+    .my-line { color: #0b3d91; }
+    .rival-line { color: #c79a00; }
+    .arkoz-line { color: #c62828; }
+    .ege-line { color: #1b5e20; }
+    .kcs-line { color: #00a8e8; }
+    .btg-line { color: #7b1fa2; }
+    .cnr-line { color: #ef6c00; }
+    .nuh-line { color: #6d4c41; }
+    .warn-line { color: #b00020; }
 
-#map {
-  height: 500px;
-  width: 100%;
-  margin-top: 5px;
-}
+    #suggestions {
+      position: absolute;
+      top: 68px;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #ccc;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+    }
 
-#result {
-  margin-top: 8px;
-  min-height: 110px;
-  max-height: 110px;
-  overflow-y: auto;
-  white-space: pre-line;
-  line-height: 22px;
-  font-size: 14px;
-}</style>
+    .suggestion-item {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .suggestion-item:hover {
+      background: #f2f2f2;
+    }
+
+    .distance-label-wrap {
+      position: relative;
+      transform: translate(-50%, -120%);
+      pointer-events: none;
+    }
+
+    .distance-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 96px;
+      height: 38px;
+      padding: 0 16px;
+      background: rgba(255, 255, 255, 0.97);
+      border: 2px solid currentColor;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: bold;
+      white-space: nowrap;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+      text-align: center;
+      line-height: 1;
+      box-sizing: border-box;
+    }
+
+    .distance-pointer {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 31px;
+      font-size: 14px;
+      line-height: 1;
+    }
+  </style>
 </head>
-
 <body>
 
-<h2>Fabrika → Varış Yeri Mesafe Hesaplama</h2>
+  <h2>Fabrika → Varış Yeri Mesafe Hesaplama</h2>
 
-<div class="controls">
-  <div>
-    <label>Başlangıç Noktası</label><br>
-    <select id="start">
-      <option value="">Fabrika seçiniz</option>
-      <option value="corlu">Çorlu</option>
-      <option value="kirikkale">Kırıkkale</option>
-    </select>
+  <div class="controls">
+    <div class="control-group">
+      <label for="startSelect">Başlangıç Noktası</label>
+      <select id="startSelect">
+        <option value="" selected disabled>Fabrika seçiniz</option>
+        <option value="kirikkale">Kırıkkale Fabrika</option>
+        <option value="corlu">Çorlu Fabrika</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label for="destinationInput">Varış Yeri</label>
+      <input type="text" id="destinationInput" placeholder="" autocomplete="off" />
+      <div id="suggestions"></div>
+    </div>
+
+    <div class="control-group">
+      <button id="calculateBtn">Hesapla</button>
+    </div>
+
+    <div class="control-group">
+      <button id="clearBtn" type="button">Seçimi Temizle</button>
+    </div>
   </div>
 
-  <div>
-    <label>Varış Yeri</label><br>
-    <input type="text" id="end" placeholder="Şehir giriniz">
-  </div>
+  <div id="map"></div>
+  <div id="info">Varış yeri seçilmedi.</div>
 
-  <div>
-    <button onclick="hesapla()">Hesapla</button>
-  </div>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <div>
-    <button onclick="temizle()">Seçimi Temizle</button>
-  </div>
-</div>
+  <script>
+    const PRICE_API_URL = "https://script.google.com/macros/s/AKfycbyoiajcbWbl-pkn37lXOtA399MlcPBiezliboucvTnEpnHvYaFZ0vto6-ShFtcgEBKoNw/exec";
 
-<div id="map"></div>
+    const MY_COLOR = "#0b3d91";
+    const YTONG_COLOR = "#c79a00";
+    const ARKOZ_COLOR = "#c62828";
+    const EGE_COLOR = "#1b5e20";
+    const KCS_COLOR = "#00a8e8";
+    const BTG_COLOR = "#7b1fa2";
+    const CNR_COLOR = "#ef6c00";
+    const NUH_COLOR = "#6d4c41";
+    const DISTANCE_LIMIT_KM = 500;
 
-<div id="result">Varış yeri seçilmedi.</div>
+    const PRICE_CACHE_MS = 5 * 60 * 1000;
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    const factories = {
+      kirikkale: {
+        name: "Kırıkkale Fabrika",
+        coords: [39.761207, 33.473725]
+      },
+      corlu: {
+        name: "Çorlu Fabrika",
+        coords: [41.27813, 27.60747]
+      }
+    };
 
-<script>
+    const rivalStartPoints = {
+      bilecik: { name: "Bilecik", coords: [40.28976, 30.01532] },
+      btg: { name: "BTG", coords: [37.02362, 36.12723] },
+      dilovasi: { name: "Dilovası", coords: [40.81595, 29.55779] },
+      saray: { name: "Saray", coords: [41.41223, 27.83725] },
+      catalca: { name: "Çatalca", coords: [41.20506, 28.45473] },
+      arkoz: { name: "Arkoz", coords: [41.01296, 35.81233] },
+      antalya: { name: "Antalya", coords: [37.09081, 30.61814] },
+      ege: { name: "EGE", coords: [38.43196, 27.22032] },
+      kcs: { name: "KÇS", coords: [37.76153, 27.44458] },
+      cnr: { name: "ÇNR", coords: [38.37898, 38.17688] },
+      nuh: { name: "NUH", coords: [40.79563, 29.59402] }
+    };
 
-// HARİTA BAŞLAT
-var map = L.map('map').setView([39, 35], 6);
+    const rivalAliases = {
+      bilecik: ["bilecik", "bilecik fabrika", "ytong bilecik"],
+      btg: ["btg", "btg fabrika"],
+      dilovasi: ["dilovasi", "dilovası", "dilovasi fabrika", "dilovası fabrika"],
+      saray: ["saray", "saray fabrika", "ytong saray"],
+      catalca: ["catalca", "çatalca", "catalca fabrika", "çatalca fabrika"],
+      arkoz: ["arkoz", "arkoz fabrika"],
+      antalya: ["antalya", "antalya fabrika", "ytong antalya", "antalya ytong", "ytong antalya fabrikasi", "ytong antalya fabrikası"],
+      ege: ["ege", "ege fabrika"],
+      kcs: ["kcs", "kçs", "kcs fabrika", "kçs fabrika"],
+      cnr: ["cnr", "çnr", "cnr fabrika", "çnr fabrika"],
+      nuh: ["nuh", "nuh fabrika"]
+    };
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
-}).addTo(map);
+    const limitedRivals = [
+      {
+        key: "arkoz",
+        name: "Arkoz",
+        coords: [41.01296, 35.81233],
+        color: ARKOZ_COLOR,
+        cssClass: "arkoz-line",
+        priceKey: "arkoz_fiyat",
+        dateKey: "arkoz_tarih"
+      },
+      {
+        key: "ege",
+        name: "EGE",
+        coords: [38.43196, 27.22032],
+        color: EGE_COLOR,
+        cssClass: "ege-line",
+        priceKey: "ege_fiyat",
+        dateKey: "ege_tarih"
+      },
+      {
+        key: "kcs",
+        name: "KÇS",
+        coords: [37.76153, 27.44458],
+        color: KCS_COLOR,
+        cssClass: "kcs-line",
+        priceKey: "kcs_fiyat",
+        dateKey: "kcs_tarih"
+      },
+      {
+        key: "btg",
+        name: "BTG",
+        coords: [37.02362, 36.12723],
+        color: BTG_COLOR,
+        cssClass: "btg-line",
+        priceKey: "btg_fiyat",
+        dateKey: "btg_tarih"
+      },
+      {
+        key: "cnr",
+        name: "ÇNR",
+        coords: [38.37898, 38.17688],
+        color: CNR_COLOR,
+        cssClass: "cnr-line",
+        priceKey: "cnr_fiyat",
+        dateKey: "cnr_tarih"
+      },
+      {
+        key: "nuh",
+        name: "NUH",
+        coords: [40.79563, 29.59402],
+        color: NUH_COLOR,
+        cssClass: "nuh-line",
+        priceKey: "nuh_fiyat",
+        dateKey: "nuh_tarih"
+      }
+    ];
 
-// ÖRNEK FONKSİYONLAR (mevcut kodun varsa bunları değiştirirsin)
+    let priceData = [];
+    let selectedDestination = null;
+    let apiHasLokasyonKey = false;
+    let lastPriceLoadAt = 0;
 
-function hesapla() {
-  document.getElementById("result").innerText = "Hesaplama yapıldı (örnek).";
-}
+    let routeLayers = [];
+    let pointMarkers = [];
+    let distanceLabels = [];
 
-function temizle() {
-  document.getElementById("start").value = "";
-  document.getElementById("end").value = "";
-  document.getElementById("result").innerText = "Temizlendi.";
-}
+    const routeCache = new Map();
 
-</script>
+    const startSelect = document.getElementById("startSelect");
+    const destinationInput = document.getElementById("destinationInput");
+    const suggestionsBox = document.getElementById("suggestions");
+    const calculateBtn = document.getElementById("calculateBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const infoBox = document.getElementById("info");
+
+    const map = L.map("map").setView([39.9, 34.5], 6);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    function normalizeText(text) {
+      return String(text || "")
+        .toLowerCase()
+        .replace(/ç/g, "c")
+        .replace(/ğ/g, "g")
+        .replace(/ı/g, "i")
+        .replace(/i̇/g, "i")
+        .replace(/ö/g, "o")
+        .replace(/ş/g, "s")
+        .replace(/ü/g, "u")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function haversineDistanceKm(coord1, coord2) {
+      const R = 6371;
+      const lat1 = coord1[0] * Math.PI / 180;
+      const lon1 = coord1[1] * Math.PI / 180;
+      const lat2 = coord2[0] * Math.PI / 180;
+      const lon2 = coord2[1] * Math.PI / 180;
+
+      const dLat = lat2 - lat1;
+      const dLon = lon2 - lon1;
+
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1) * Math.cos(lat2) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function shouldDisplayLimitedRoute(startCoords, endCoords, routeDistanceKm) {
+      if (routeDistanceKm <= DISTANCE_LIMIT_KM) {
+        return true;
+      }
+
+      const birdKm = haversineDistanceKm(startCoords, endCoords);
+
+      // OSRM bazen anormal uzun rota döndürebiliyor.
+      // Kuş uçuşu çok düşükse bu rotayı yine göster.
+      if (birdKm <= 300) {
+        return true;
+      }
+
+      return false;
+    }
+
+    function clearMapLayers() {
+      routeLayers.forEach(layer => map.removeLayer(layer));
+      pointMarkers.forEach(marker => map.removeLayer(marker));
+      distanceLabels.forEach(label => map.removeLayer(label));
+
+      routeLayers = [];
+      pointMarkers = [];
+      distanceLabels = [];
+    }
+
+    function resetAll() {
+      clearMapLayers();
+      startSelect.value = "";
+      destinationInput.value = "";
+      selectedDestination = null;
+      suggestionsBox.innerHTML = "";
+      suggestionsBox.style.display = "none";
+      infoBox.innerHTML = "Varış yeri seçilmedi.";
+      map.setView([39.9, 34.5], 6);
+    }
+
+    async function loadPriceData(forceReload = false) {
+      const isCacheFresh = (Date.now() - lastPriceLoadAt) < PRICE_CACHE_MS;
+
+      if (!forceReload && priceData.length > 0 && isCacheFresh) {
+        return priceData;
+      }
+
+      const cacheBreaker = "t=" + Date.now();
+      const url = PRICE_API_URL + (PRICE_API_URL.includes("?") ? "&" : "?") + cacheBreaker;
+
+      const response = await fetch(url, { cache: "no-store" });
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error("Sheet verisi dizi formatında gelmedi.");
+      }
+
+      priceData = data.map(row => {
+        const newRow = { ...row };
+        Object.keys(newRow).forEach(key => {
+          if (typeof newRow[key] === "string") {
+            newRow[key] = newRow[key].trim();
+          }
+        });
+        return newRow;
+      });
+
+      apiHasLokasyonKey = priceData.some(row =>
+        normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") !== ""
+      );
+
+      lastPriceLoadAt = Date.now();
+      return priceData;
+    }
+
+    function getUniqueSheetIller() {
+      const set = new Set();
+
+      priceData.forEach(row => {
+        const ilValue = normalizeText(row.il_normalized || row.il || "");
+        if (ilValue) set.add(ilValue);
+      });
+
+      return Array.from(set);
+    }
+
+    function getAddressValues(destinationObj) {
+      const address = destinationObj && destinationObj.address ? destinationObj.address : {};
+      return [
+        address.city,
+        address.town,
+        address.state,
+        address.province,
+        address.county,
+        address.city_district,
+        address.state_district,
+        address.municipality,
+        address.suburb,
+        address.village
+      ].map(x => normalizeText(x)).filter(Boolean);
+    }
+
+    function getDisplayParts(text) {
+      return String(text || "")
+        .split(",")
+        .map(x => normalizeText(x))
+        .filter(Boolean);
+    }
+
+    function resolveDestinationForSheet(destinationObj, inputText) {
+      const displayText = destinationObj?.display_name || inputText || "";
+      const displayParts = getDisplayParts(displayText);
+      const addressValues = getAddressValues(destinationObj);
+      const provinceList = getUniqueSheetIller();
+
+      const searchPool = [...displayParts, ...addressValues];
+      let province = "";
+
+      for (const part of searchPool) {
+        if (provinceList.includes(part)) {
+          province = part;
+          break;
+        }
+      }
+
+      if (!province && displayParts.length > 0) {
+        province = displayParts[0];
+      }
+
+      const firstPart = displayParts[0] || "";
+      let districtKey = "";
+
+      if (firstPart && province && firstPart !== province) {
+        districtKey = firstPart;
+      }
+
+      return { province, districtKey, displayText };
+    }
+
+    function getFactoryMatchedRows(rows, selectedFactoryKey) {
+      const selectedFactoryName = normalizeText(factories[selectedFactoryKey]?.name || "");
+
+      const matched = rows.filter(row =>
+        normalizeText(row.stt_baslangic_normalized || row.stt_baslangic || "") === selectedFactoryName
+      );
+
+      return matched.length > 0 ? matched : rows;
+    }
+
+    function getRowCompletenessScore(row) {
+      const keys = [
+        "stt_fiyat", "stt_tarih", "stt_baslangic",
+        "ytong_baslangic", "ytong_fiyat", "ytong_tarih",
+        "arkoz_fiyat", "arkoz_tarih",
+        "ege_fiyat", "ege_tarih",
+        "kcs_fiyat", "kcs_tarih",
+        "btg_fiyat", "btg_tarih",
+        "cnr_fiyat", "cnr_tarih",
+        "nuh_fiyat", "nuh_tarih"
+      ];
+
+      return keys.reduce((score, key) => {
+        return score + (String(row[key] || "").trim() !== "" ? 1 : 0);
+      }, 0);
+    }
+
+    function pickBestRow(rows) {
+      if (!rows || rows.length === 0) return null;
+
+      return [...rows].sort((a, b) => {
+        const lokA = normalizeText(a.lokasyon_key_normalized || a.lokasyon_key || "");
+        const lokB = normalizeText(b.lokasyon_key_normalized || b.lokasyon_key || "");
+        const scoreA = getRowCompletenessScore(a);
+        const scoreB = getRowCompletenessScore(b);
+
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        if (lokA === "" && lokB !== "") return -1;
+        if (lokA !== "" && lokB === "") return 1;
+        return 0;
+      })[0];
+    }
+
+    function findSheetRow(destinationObj, inputText, selectedFactoryKey) {
+      const resolved = resolveDestinationForSheet(destinationObj, inputText);
+
+      if (!resolved.province) return null;
+
+      const provinceRows = priceData.filter(row =>
+        normalizeText(row.il_normalized || row.il || "") === resolved.province
+      );
+
+      if (provinceRows.length === 0) return null;
+
+      const factoryRows = getFactoryMatchedRows(provinceRows, selectedFactoryKey);
+
+      if (resolved.districtKey) {
+        const exactDistrictRows = factoryRows.filter(row =>
+          normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === resolved.districtKey
+        );
+        if (exactDistrictRows.length > 0) {
+          return pickBestRow(exactDistrictRows);
+        }
+
+        const containsDistrictRows = factoryRows.filter(row => {
+          const lokasyon = normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "");
+          return lokasyon && (lokasyon.includes(resolved.districtKey) || resolved.districtKey.includes(lokasyon));
+        });
+        if (containsDistrictRows.length > 0) {
+          return pickBestRow(containsDistrictRows);
+        }
+      }
+
+      const blankLokasyonRows = factoryRows.filter(row =>
+        normalizeText(row.lokasyon_key_normalized || row.lokasyon_key || "") === ""
+      );
+
+      if (blankLokasyonRows.length > 0) {
+        return pickBestRow(blankLokasyonRows);
+      }
+
+      return pickBestRow(factoryRows);
+    }
+
+    function formatDate(value) {
+      if (!value) return "";
+
+      if (typeof value === "string") {
+        if (value.includes("T")) {
+          return value.split("T")[0].split("-").reverse().join(".");
+        }
+        return value;
+      }
+
+      return String(value);
+    }
+
+    function getOwnPriceFromRow(sheetRow) {
+      if (!sheetRow) {
+        return { price: "", date: "", unit: "TL/ton" };
+      }
+
+      return {
+        price: sheetRow.stt_fiyat || "",
+        date: formatDate(sheetRow.stt_tarih || ""),
+        unit: sheetRow.birim || "TL/ton"
+      };
+    }
+
+    function getRouteCacheKey(start, end) {
+      return [
+        Number(start[0]).toFixed(6),
+        Number(start[1]).toFixed(6),
+        Number(end[0]).toFixed(6),
+        Number(end[1]).toFixed(6)
+      ].join("|");
+    }
+
+    async function fetchBestRoute(start, end) {
+      const cacheKey = getRouteCacheKey(start, end);
+
+      if (routeCache.has(cacheKey)) {
+        return routeCache.get(cacheKey);
+      }
+
+      const url =
+        "https://router.project-osrm.org/route/v1/driving/" +
+        start[1] + "," + start[0] + ";" +
+        end[1] + "," + end[0] +
+        "?overview=full&geometries=geojson";
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!data.routes || data.routes.length === 0) {
+        routeCache.set(cacheKey, null);
+        return null;
+      }
+
+      const bestRoute = data.routes[0];
+      routeCache.set(cacheKey, bestRoute);
+      return bestRoute;
+    }
+
+    function createDistanceLabel(routeCoords, text, color, ratio = 0.14) {
+      const pointIndex = Math.max(1, Math.floor(routeCoords.length * ratio));
+      const point = routeCoords[pointIndex] || routeCoords[1] || routeCoords[0];
+
+      const icon = L.divIcon({
+        className: "",
+        html:
+          '<div class="distance-label-wrap" style="color:' + color + ';">' +
+            '<div class="distance-label">' + text + '</div>' +
+            '<div class="distance-pointer">&#9660;</div>' +
+          '</div>'
+      });
+
+      return L.marker(point, {
+        icon: icon,
+        interactive: false,
+        keyboard: false
+      });
+    }
+
+    function addMapMarker(coords, popupText) {
+      const marker = L.marker(coords).addTo(map).bindPopup(popupText);
+      pointMarkers.push(marker);
+      return marker;
+    }
+
+    function addRouteToMap(routeCoords, color, distanceKm, orderPool, options = {}) {
+      const line = L.polyline(routeCoords, {
+        color: color,
+        weight: options.weight ?? 5,
+        opacity: options.opacity ?? 0.95,
+        dashArray: options.dashArray || null
+      }).addTo(map);
+
+      routeLayers.push(line);
+
+      const label = createDistanceLabel(
+        routeCoords,
+        distanceKm.toFixed(1) + " km",
+        color,
+        options.labelRatio ?? 0.14
+      ).addTo(map);
+
+      distanceLabels.push(label);
+
+      orderPool.push({
+        line: line,
+        distanceKm: distanceKm,
+        priority: options.priority ?? 1
+      });
+
+      return line;
+    }
+
+    function applyRouteDisplayPriority(orderPool) {
+      orderPool
+        .sort((a, b) => {
+          if (a.priority !== b.priority) return a.priority - b.priority;
+          return b.distanceKm - a.distanceKm;
+        })
+        .forEach(item => item.line.bringToFront());
+    }
+
+    function renderInfo(myFactoryName, destinationName, myPriceData, rivalEntries, extraWarnings = []) {
+      const commonUnit = myPriceData.unit || "TL/ton";
+
+      let myText =
+        "Başlangıç: " + myFactoryName +
+        " | Varış: " + destinationName;
+
+      if (myPriceData && myPriceData.price) {
+        myText +=
+          " | Nakliye: " + myPriceData.price + " " + commonUnit +
+          (myPriceData.date ? " | Fiyat Güncelleme Tarihi: " + myPriceData.date : "");
+      } else {
+        myText += " | Nakliye: TANIMLI DEĞİL";
+      }
+
+      let html = '<div class="info-line my-line">' + myText + '</div>';
+
+      rivalEntries.forEach(item => {
+        let text =
+          "Rakip Çıkış Noktası: " + item.name +
+          " | Varış: " + destinationName;
+
+        if (item.price) {
+          text +=
+            " | Nakliye: " + item.price + " " + commonUnit +
+            (item.date ? " | Fiyat Güncelleme Tarihi: " + item.date : "");
+        } else {
+          text += " | Nakliye: TANIMLI DEĞİL";
+        }
+
+        html += '<div class="info-line ' + item.cssClass + '">' + text + '</div>';
+      });
+
+      extraWarnings.forEach(warn => {
+        html += '<div class="info-line warn-line">' + warn + '</div>';
+      });
+
+      infoBox.innerHTML = html;
+    }
+
+    function resolveRivalStartPoint(rawValue) {
+      const normalized = normalizeText(rawValue || "");
+      if (!normalized) return null;
+
+      for (const [key, point] of Object.entries(rivalStartPoints)) {
+        if (normalizeText(key) === normalized) return point;
+        if (normalizeText(point.name) === normalized) return point;
+      }
+
+      for (const [key, aliases] of Object.entries(rivalAliases)) {
+        if (aliases.some(alias => normalizeText(alias) === normalized)) {
+          return rivalStartPoints[key] || null;
+        }
+      }
+
+      for (const [key, aliases] of Object.entries(rivalAliases)) {
+        if (aliases.some(alias => normalized.includes(normalizeText(alias)) || normalizeText(alias).includes(normalized))) {
+          return rivalStartPoints[key] || null;
+        }
+      }
+
+      return null;
+    }
+
+    async function renderRoute() {
+      if (!startSelect.value) {
+        infoBox.innerHTML = '<div class="info-line warn-line">Lütfen başlangıç noktası seç.</div>';
+        return;
+      }
+
+      if (!selectedDestination) {
+        infoBox.innerHTML = "Lütfen varış yeri seç.";
+        return;
+      }
+
+      calculateBtn.disabled = true;
+      calculateBtn.textContent = "Hesaplanıyor...";
+
+      try {
+        await loadPriceData(false);
+
+        const selectedFactoryKey = startSelect.value;
+        const selectedFactory = factories[selectedFactoryKey];
+        const start = selectedFactory.coords;
+        const end = [parseFloat(selectedDestination.lat), parseFloat(selectedDestination.lon)];
+        const destinationTextForPricing = destinationInput.value || selectedDestination.display_name || "";
+
+        clearMapLayers();
+
+        addMapMarker(start, selectedFactory.name);
+        addMapMarker(end, selectedDestination.display_name);
+
+        infoBox.innerHTML = '<div class="info-line my-line">Mesafe hesaplanıyor...</div>';
+
+        const sheetRow = findSheetRow(selectedDestination, destinationTextForPricing, selectedFactoryKey);
+
+        const myRoutePromise = fetchBestRoute(start, end);
+
+        let ytongPromise = null;
+        let ytongStartPoint = null;
+        let rawYtongStartValue = "";
+
+        if (sheetRow && (sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic)) {
+          rawYtongStartValue = sheetRow.ytong_baslangic_normalized || sheetRow.ytong_baslangic || "";
+          ytongStartPoint = resolveRivalStartPoint(rawYtongStartValue);
+
+          if (ytongStartPoint) {
+            ytongPromise = fetchBestRoute(ytongStartPoint.coords, end);
+          }
+        }
+
+        const rivalPromises = limitedRivals.map(rival =>
+          fetchBestRoute(rival.coords, end).then(route => ({ rival, route }))
+        );
+
+        const [myRoute, ytongRoute, rivalResults] = await Promise.all([
+          myRoutePromise,
+          ytongPromise ? ytongPromise : Promise.resolve(null),
+          Promise.all(rivalPromises)
+        ]);
+
+        if (!myRoute) {
+          infoBox.innerHTML = "Rota bulunamadı.";
+          return;
+        }
+
+        const orderPool = [];
+        const warnings = [];
+        const rivalEntries = [];
+
+        const myDistanceKm = myRoute.distance / 1000;
+        const ownPrice = getOwnPriceFromRow(sheetRow);
+
+        const myCoords = myRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        addRouteToMap(myCoords, MY_COLOR, myDistanceKm, orderPool, {
+          weight: 6,
+          opacity: 0.95,
+          priority: 2,
+          labelRatio: 0.12
+        });
+
+        const myPriceData = {
+          price: ownPrice.price,
+          date: ownPrice.date,
+          unit: ownPrice.unit
+        };
+
+        if (!apiHasLokasyonKey) {
+          warnings.push("Uyarı: API çıktısında lokasyon_key alanı görünmüyor. App Script eski deployment olabilir.");
+        }
+
+        if (ytongStartPoint && ytongRoute) {
+          const ytongDistanceKm = ytongRoute.distance / 1000;
+          const ytongAllowed = shouldDisplayLimitedRoute(ytongStartPoint.coords, end, ytongDistanceKm);
+
+          if (ytongAllowed) {
+            const ytongCoords = ytongRoute.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+
+            addMapMarker(ytongStartPoint.coords, "Ytong - " + ytongStartPoint.name);
+            addRouteToMap(ytongCoords, YTONG_COLOR, ytongDistanceKm, orderPool, {
+              weight: 5,
+              opacity: 0.9,
+              dashArray: "10,8",
+              priority: 1,
+              labelRatio: 0.18
+            });
+
+            rivalEntries.push({
+              name: "Ytong - " + ytongStartPoint.name,
+              distance: ytongDistanceKm.toFixed(1),
+              price: sheetRow.ytong_fiyat || "",
+              date: formatDate(sheetRow.ytong_tarih || ""),
+              cssClass: "rival-line"
+            });
+          }
+        }
+
+        rivalResults.forEach(({ rival, route }) => {
+          if (!route) return;
+
+          const rivalDistanceKm = route.distance / 1000;
+          const rivalAllowed = shouldDisplayLimitedRoute(rival.coords, end, rivalDistanceKm);
+
+          if (!rivalAllowed) return;
+
+          const rivalCoords = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+
+          addMapMarker(rival.coords, rival.name);
+          addRouteToMap(rivalCoords, rival.color, rivalDistanceKm, orderPool, {
+            weight: 5,
+            opacity: 0.9,
+            dashArray: "10,8",
+            priority: 1,
+            labelRatio: 0.18
+          });
+
+          rivalEntries.push({
+            name: rival.name,
+            distance: rivalDistanceKm.toFixed(1),
+            price: sheetRow ? (sheetRow[rival.priceKey] || "") : "",
+            date: sheetRow ? formatDate(sheetRow[rival.dateKey] || "") : "",
+            cssClass: rival.cssClass
+          });
+        });
+
+        applyRouteDisplayPriority(orderPool);
+
+        renderInfo(
+          selectedFactory.name,
+          selectedDestination.display_name,
+          myPriceData,
+          rivalEntries,
+          warnings
+        );
+
+        const group = [...routeLayers, ...pointMarkers, ...distanceLabels];
+        if (group.length > 0) {
+          const featureGroup = L.featureGroup(group);
+          map.fitBounds(featureGroup.getBounds(), { padding: [18, 18] });
+        }
+
+        if (!sheetRow) {
+          infoBox.innerHTML += '<div class="info-line warn-line">Uyarı: Sheet içinde bu varış yeri için eşleşen satır bulunamadı.</div>';
+        }
+
+      } catch (error) {
+        console.error(error);
+        infoBox.innerHTML = "Hata oluştu: rota verisi veya fiyat verisi alınamadı.";
+      } finally {
+        calculateBtn.disabled = false;
+        calculateBtn.textContent = "Hesapla";
+      }
+    }
+
+    let searchTimeout = null;
+
+    destinationInput.addEventListener("input", function () {
+      const query = this.value.trim();
+      selectedDestination = null;
+
+      if (query.length < 3) {
+        suggestionsBox.style.display = "none";
+        suggestionsBox.innerHTML = "";
+        return;
+      }
+
+      clearTimeout(searchTimeout);
+
+      searchTimeout = setTimeout(() => {
+        const searchUrl =
+          "https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&countrycodes=tr&q=" +
+          encodeURIComponent(query);
+
+        fetch(searchUrl, {
+          headers: {
+            "Accept-Language": "tr"
+          }
+        })
+          .then(response => response.json())
+          .then(results => {
+            suggestionsBox.innerHTML = "";
+
+            if (!results || results.length === 0) {
+              suggestionsBox.style.display = "none";
+              return;
+            }
+
+            results.forEach(item => {
+              const div = document.createElement("div");
+              div.className = "suggestion-item";
+              div.textContent = item.display_name;
+
+              div.addEventListener("click", function () {
+                destinationInput.value = item.display_name;
+                selectedDestination = item;
+                suggestionsBox.style.display = "none";
+                suggestionsBox.innerHTML = "";
+              });
+
+              suggestionsBox.appendChild(div);
+            });
+
+            suggestionsBox.style.display = "block";
+          })
+          .catch(error => {
+            console.error(error);
+            suggestionsBox.style.display = "none";
+          });
+      }, 400);
+    });
+
+    document.addEventListener("click", function (e) {
+      if (!suggestionsBox.contains(e.target) && e.target !== destinationInput) {
+        suggestionsBox.style.display = "none";
+      }
+    });
+
+    calculateBtn.addEventListener("click", function () {
+      renderRoute();
+    });
+
+    clearBtn.addEventListener("click", function () {
+      resetAll();
+    });
+  </script>
 
 </body>
 </html>
