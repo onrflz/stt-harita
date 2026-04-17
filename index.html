@@ -15,25 +15,28 @@ body {
 }
 
 h2 {
-  margin-bottom: 10px;
+  font-size: 0.85em;        /* %15 küçüldü */
+  margin-bottom: 5px;
 }
 
 .controls {
   display: flex;
-  gap: 8px;
+  gap: 6px;                 /* biraz sıkıştı */
   align-items: flex-end;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
 }
 
 .controls > div {
   display: flex;
   flex-direction: column;
+  gap: 2px;                 /* label ile kutu arası boşluk gitti */
 }
 
 label {
   font-size: 0.8em;
-  margin-bottom: 4px;
+  margin-bottom: 0;         /* boşluk kaldırıldı */
+  line-height: 1;           /* ekstra sıkı */
 }
 
 select,
@@ -51,11 +54,11 @@ button {
 }
 
 #end {
-  width: 150px;
+  width: 140px;             /* biraz daha küçüldü */
 }
 
 button {
-  width: 95px;
+  width: 90px;
   white-space: nowrap;
 }
 
@@ -73,8 +76,7 @@ button {
   white-space: pre-line;
   line-height: 22px;
   font-size: 14px;
-}
-</style>
+}</style>
 </head>
 
 <body>
