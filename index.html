@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Fabrika → Varış Yeri Mesafe Hesaplama</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
   <style>
@@ -12,52 +13,72 @@
     }
 
     h2 {
-      margin: 0 0 10px 0;
-      font-size: 22px;
+      margin: 0 0 8px 0;
+      font-size: 18px;
     }
 
     .controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       align-items: flex-end;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .control-group {
       display: flex;
       flex-direction: column;
-      min-width: 220px;
+      min-width: 160px;
       position: relative;
+      gap: 2px;
     }
 
     label {
       font-weight: bold;
-      margin-bottom: 5px;
-      font-size: 14px;
+      margin: 0;
+      padding: 0;
+      font-size: 13px;
+      line-height: 1.1;
     }
 
-    select, input, button {
-      padding: 9px 10px;
-      font-size: 14px;
-      height: 44px;
+    select,
+    input,
+    button {
+      padding: 6px 8px;
+      font-size: 13px;
+      height: 36px;
       box-sizing: border-box;
+    }
+
+    #startSelect {
+      width: 170px;
+    }
+
+    #destinationInput {
+      width: 170px;
     }
 
     button {
       cursor: pointer;
-      min-width: 130px;
+      min-width: 110px;
+      white-space: nowrap;
     }
 
     #map {
-      height: 490px;
+      height: 62vh;
+      min-height: 430px;
+      max-height: 680px;
       width: 100%;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     #info {
-      margin-top: 10px;
-      line-height: 1.45;
+      margin-top: 8px;
+      line-height: 1.4;
+      min-height: 100px;
+      max-height: 110px;
+      overflow-y: auto;
+      white-space: normal;
     }
 
     .info-line {
@@ -78,7 +99,7 @@
 
     #suggestions {
       position: absolute;
-      top: 68px;
+      top: calc(100% + 2px);
       left: 0;
       right: 0;
       background: white;
@@ -132,6 +153,71 @@
       top: 15px;
       font-size: 7px;
       line-height: 1;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        margin: 10px 12px;
+      }
+
+      h2 {
+        font-size: 17px;
+      }
+
+      .controls {
+        gap: 6px;
+      }
+
+      .control-group {
+        min-width: 140px;
+      }
+
+      #startSelect,
+      #destinationInput {
+        width: 150px;
+      }
+
+      button {
+        min-width: 100px;
+      }
+
+      #map {
+        height: 58vh;
+        min-height: 380px;
+      }
+
+      #info {
+        min-height: 92px;
+        max-height: 108px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .controls {
+        align-items: stretch;
+      }
+
+      .control-group {
+        width: 100%;
+        min-width: unset;
+      }
+
+      #startSelect,
+      #destinationInput,
+      button {
+        width: 100%;
+        min-width: unset;
+      }
+
+      #map {
+        height: 52vh;
+        min-height: 320px;
+      }
+
+      #info {
+        min-height: 88px;
+        max-height: 104px;
+      }
     }
   </style>
 </head>
@@ -344,8 +430,6 @@
 
       const birdKm = haversineDistanceKm(startCoords, endCoords);
 
-      // OSRM bazen anormal uzun rota döndürebiliyor.
-      // Kuş uçuşu çok düşükse bu rotayı yine göster.
       if (birdKm <= 300) {
         return true;
       }
