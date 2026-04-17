@@ -15,13 +15,14 @@ body {
 }
 
 h2 {
-  font-size: 0.85em;        /* %15 küçüldü */
+  font-size: 0.85em;
   margin-bottom: 5px;
+  margin-top: 0;
 }
 
 .controls {
   display: flex;
-  gap: 6px;                 /* biraz sıkıştı */
+  gap: 6px;
   align-items: flex-end;
   flex-wrap: wrap;
   margin-bottom: 5px;
@@ -30,13 +31,15 @@ h2 {
 .controls > div {
   display: flex;
   flex-direction: column;
-  gap: 2px;                 /* label ile kutu arası boşluk gitti */
+  gap: 0;                  /* tamamen kapat */
 }
 
 label {
+  display: block;
   font-size: 0.8em;
-  margin-bottom: 0;         /* boşluk kaldırıldı */
-  line-height: 1;           /* ekstra sıkı */
+  margin: 0;               /* tüm marginleri sıfırla */
+  padding: 0;              /* padding sıfırla */
+  line-height: 1;          /* satır yüksekliğini sıkıştır */
 }
 
 select,
@@ -46,6 +49,7 @@ button {
   padding: 4px 6px;
   height: 30px;
   box-sizing: border-box;
+  margin-top: 0;           /* ekstra üst boşluk kalmasın */
 }
 
 /* TEK TEK GENİŞLİKLER */
@@ -54,7 +58,7 @@ button {
 }
 
 #end {
-  width: 140px;             /* biraz daha küçüldü */
+  width: 140px;
 }
 
 button {
