@@ -14,12 +14,10 @@ body {
   margin: 10px;
 }
 
-/* BAŞLIK */
 h2 {
   margin-bottom: 10px;
 }
 
-/* ÜST KONTROL ALANI */
 .controls {
   display: flex;
   gap: 8px;
@@ -28,28 +26,45 @@ h2 {
   margin-bottom: 8px;
 }
 
-/* INPUT + SELECT + BUTTON (%80 BOYUT) */
+.controls > div {
+  display: flex;
+  flex-direction: column;
+}
+
+label {
+  font-size: 0.8em;
+  margin-bottom: 4px;
+}
+
 select,
 input,
 button {
   font-size: 0.8em;
-  padding: 5px 8px;
+  padding: 4px 6px;
   height: 30px;
+  box-sizing: border-box;
 }
 
-/* LABEL */
-label {
-  font-size: 0.8em;
+/* TEK TEK GENİŞLİKLER */
+#start {
+  width: 110px;
 }
 
-/* HARİTA */
+#end {
+  width: 150px;
+}
+
+button {
+  width: 95px;
+  white-space: nowrap;
+}
+
 #map {
   height: 500px;
   width: 100%;
   margin-top: 5px;
 }
 
-/* AÇIKLAMA ALANI (5 SATIR SABİT) */
 #result {
   margin-top: 8px;
   min-height: 110px;
@@ -59,7 +74,6 @@ label {
   line-height: 22px;
   font-size: 14px;
 }
-
 </style>
 </head>
 
